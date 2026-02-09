@@ -17,6 +17,6 @@ Android приложение для аутентификации и управл
 ## Технологии
 - Kotlin, Jetpack Compose
 - Clean Architecture + MVVM
-- Ktor для сетевых запросов
+- Retrofit для сетевых запросов
 - Dependency Injection (Koin/Hilt)
 - Модульная архитектура
