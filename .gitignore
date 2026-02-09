@@ -1,0 +1,57 @@
+﻿## --- :  Т СТЫ --- ##
+
+# 1. Ы Ф С СТ (не коммитить)
+appsettings.json
+appsettings.Development.json
+appsettings.Staging.json
+appsettings.Production.json
+secrets.json
+*.user.secrets
+
+# 2. : Ы Ф (коммитить)
+# !appsettings.example.json
+
+# 3. ФЫ VISUAL STUDIO
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# 4. СЫ ФЫ
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+bld/
+[Oo]ut/
+
+# 5. .NET CORE
+**/bin/
+**/obj/
+*.pdb
+*.Cache
+project.lock.json
+*.nupkg
+packages/
+
+# 6. Ц ССТ
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 7. IDE
+.vscode/
+.idea/
+*.sln.iml
+
+# 8. ТСТЫ  
+TestResults/
+*.trx
+*.coverage
+*.log
+*.tmp

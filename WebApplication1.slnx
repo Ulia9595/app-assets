@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Server.Tests.Integration/Server.Tests.Integration.csproj" Id="117d10d6-ca83-48a4-8b0b-e85d3557f0f9" />
+  <Project Path="WebApplication1/WebApplication1.csproj" />
+</Solution>
