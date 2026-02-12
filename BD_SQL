@@ -1,0 +1,184 @@
+-- 1. Таблица пользователей
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    uid VARCHAR(255) UNIQUE,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    avatar_url TEXT,
+    elo_points INTEGER DEFAULT 500,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_email_verified BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- 2. Таблица доступных аватаров (вставлены ВАШИ ссылки)
+CREATE TABLE IF NOT EXISTS available_avatars (
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(50) DEFAULT 'cats',
+    url TEXT NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO available_avatars (category, url, display_order) VALUES
+('cats', 'https://raw.githubusercontent.com/Ulia9595/app-assets/main/avatars/Cat_1.jpg', 1),
+('cats', 'https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_2.jpg?raw=true', 2),
+('cats', 'https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_3.jpg?raw=true', 3),
+('cats', 'https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_4.jpg?raw=true', 4),
+('cats', 'https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_5.jpg?raw=true', 5),
+('cats', 'https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_6.jpg?raw=true', 6)
+ON CONFLICT DO NOTHING;
+
+-- 3. Таблица OTP кодов
+CREATE TABLE IF NOT EXISTS otp_codes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    purpose VARCHAR(50) NOT NULL CHECK (purpose IN ('registration', 'email_change', 'password_reset')),
+    expires_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '15 minutes'),
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Таблица токенов сброса пароля
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '1 hour'),
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Таблица рейтингов (ELO)
+CREATE TABLE IF NOT EXISTS user_ratings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    current_rating INTEGER DEFAULT 500,
+    level INTEGER DEFAULT 0,
+    games_played INTEGER DEFAULT 0,
+    games_won INTEGER DEFAULT 0,
+    games_lost INTEGER DEFAULT 0,
+    win_streak INTEGER DEFAULT 0,
+    best_rating INTEGER DEFAULT 500,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Таблица истории рейтинга
+CREATE TABLE IF NOT EXISTS rating_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    old_rating INTEGER NOT NULL,
+    new_rating INTEGER NOT NULL,
+    rating_change INTEGER NOT NULL,
+    change_reason VARCHAR(100) CHECK (change_reason IN ('game_result', 'admin_adjustment', 'initial', 'penalty', 'bonus')),
+    match_id INTEGER,
+    match_result VARCHAR(10) CHECK (match_result IN ('win', 'loss', 'draw')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 7. Таблица истории профиля
+CREATE TABLE IF NOT EXISTS profile_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    changed_field VARCHAR(50) NOT NULL CHECK (changed_field IN ('email', 'name', 'avatar', 'password')),
+    old_value TEXT,
+    new_value TEXT,
+    changed_by_ip INET,
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. Таблица сессий (для JWT)
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    session_token VARCHAR(512) UNIQUE NOT NULL,
+    device_info TEXT,
+    ip_address INET,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- === ИНДЕКСЫ ===
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_uid ON users(uid);
+CREATE INDEX IF NOT EXISTS idx_otp_codes_email_code ON otp_codes(email, code);
+CREATE INDEX IF NOT EXISTS idx_otp_codes_expires ON otp_codes(expires_at);
+CREATE INDEX IF NOT EXISTS idx_password_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_user_ratings_rating ON user_ratings(current_rating DESC);
+
+-- === ТРИГГЕРЫ ===
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Триггер для автоматического расчета уровня на основе рейтинга
+CREATE OR REPLACE FUNCTION update_user_level()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.level = NEW.current_rating / 1000;
+    IF NEW.current_rating > NEW.best_rating THEN
+        NEW.best_rating = NEW.current_rating;
+    END IF;
+    NEW.last_updated = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_level_on_rating_change
+    BEFORE INSERT OR UPDATE OF current_rating ON user_ratings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_user_level();
+
+-- Триггер для создания записи рейтинга при создании пользователя
+CREATE OR REPLACE FUNCTION create_user_rating()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO user_ratings (user_id, current_rating) VALUES (NEW.id, 500);
+    INSERT INTO rating_history (user_id, old_rating, new_rating, rating_change, change_reason)
+    VALUES (NEW.id, 0, 500, 500, 'initial');
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER create_rating_for_new_user
+    AFTER INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION create_user_rating();
+
+-- === ПРЕДСТАВЛЕНИЯ ===
+CREATE OR REPLACE VIEW user_profiles AS
+SELECT
+    u.id,
+    u.uid,
+    u.email,
+    u.name,
+    u.avatar_url,
+    u.is_email_verified,
+    u.is_active,
+    u.created_at,
+    u.updated_at,
+    COALESCE(ur.current_rating, 500) as elo_points,
+    COALESCE(ur.current_rating, 500) / 1000 as level,
+    COALESCE(ur.current_rating, 500) % 1000 as points_in_current_level,
+    (COALESCE(ur.current_rating, 500) % 1000) / 1000.0 as level_progress,
+    1000 - (COALESCE(ur.current_rating, 500) % 1000) as points_to_next_level,
+    COALESCE(ur.games_played, 0) as games_played,
+    COALESCE(ur.games_won, 0) as games_won,
+    COALESCE(ur.win_streak, 0) as win_streak,
+    COALESCE(ur.best_rating, 500) as best_rating
+FROM users u
+LEFT JOIN user_ratings ur ON u.id = ur.user_id;
