@@ -31,20 +31,6 @@ namespace WebApplication1.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasDefaultValue("cats")
-                        .HasColumnName("category");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
                     b.Property<int>("DisplayOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -57,6 +43,8 @@ namespace WebApplication1.Migrations
                         .HasColumnName("url");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DisplayOrder");
 
                     b.ToTable("available_avatars", (string)null);
                 });
@@ -77,8 +65,10 @@ namespace WebApplication1.Migrations
                         .HasColumnName("code");
 
                     b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -90,14 +80,14 @@ namespace WebApplication1.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("purpose");
+                    b.Property<int>("PurposeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose_id");
 
                     b.Property<bool>("Used")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
+                        .HasDefaultValue(false)
                         .HasColumnName("used");
 
                     b.Property<int?>("UserId")
@@ -106,9 +96,55 @@ namespace WebApplication1.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("PurposeId");
+
                     b.HasIndex("UserId");
 
+                    b.HasIndex("Email", "Code");
+
                     b.ToTable("otp_codes", (string)null);
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Entities.OtpPurpose", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("otp_purposes", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "registration"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "email_change"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "password_reset"
+                        });
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Entities.PasswordResetAttempt", b =>
@@ -119,15 +155,6 @@ namespace WebApplication1.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("BlockReason")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("block_reason");
-
-                    b.Property<bool>("Blocked")
-                        .HasColumnType("boolean")
-                        .HasColumnName("blocked");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -143,11 +170,6 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)")
                         .HasColumnName("ip_address");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("user_agent");
 
                     b.HasKey("Id");
 
@@ -197,6 +219,29 @@ namespace WebApplication1.Migrations
                     b.ToTable("password_reset_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Entities.Role", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("roles", (string)null);
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -206,17 +251,15 @@ namespace WebApplication1.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AvatarUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("avatar_url");
+                    b.Property<int?>("AvatarId")
+                        .HasColumnType("integer")
+                        .HasColumnName("avatar_id");
 
                     b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("EloPoints")
-                        .HasColumnType("integer")
-                        .HasColumnName("elo_points");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -224,17 +267,9 @@ namespace WebApplication1.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("email");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsEmailVerified")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_email_verified");
-
                     b.Property<string>("Name")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("name");
 
                     b.Property<string>("PasswordHash")
@@ -243,18 +278,23 @@ namespace WebApplication1.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_hash");
 
-                    b.Property<string>("Uid")
-                        .HasColumnType("text")
-                        .HasColumnName("uid");
+                    b.Property<int>("RoleId")
+                        .HasColumnType("integer")
+                        .HasColumnName("role_id");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
+                    b.Property<string>("Uid")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("uid");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AvatarId");
+
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("Uid")
                         .IsUnique();
@@ -271,43 +311,25 @@ namespace WebApplication1.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("BestRating")
-                        .HasColumnType("integer")
-                        .HasColumnName("best_rating");
-
                     b.Property<int>("CurrentRating")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
+                        .HasDefaultValue(500)
                         .HasColumnName("current_rating");
 
-                    b.Property<int>("GamesLost")
-                        .HasColumnType("integer")
-                        .HasColumnName("games_lost");
-
-                    b.Property<int>("GamesPlayed")
-                        .HasColumnType("integer")
-                        .HasColumnName("games_played");
-
-                    b.Property<int>("GamesWon")
-                        .HasColumnType("integer")
-                        .HasColumnName("games_won");
-
                     b.Property<DateTime>("LastUpdated")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_updated");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("integer")
-                        .HasColumnName("level");
+                        .HasColumnName("last_updated")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer")
                         .HasColumnName("user_id");
 
-                    b.Property<int>("WinStreak")
-                        .HasColumnType("integer")
-                        .HasColumnName("win_streak");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("CurrentRating");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -317,9 +339,18 @@ namespace WebApplication1.Migrations
 
             modelBuilder.Entity("WebApplication1.Models.Entities.OtpCode", b =>
                 {
+                    b.HasOne("WebApplication1.Models.Entities.OtpPurpose", "Purpose")
+                        .WithMany("OtpCodes")
+                        .HasForeignKey("PurposeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("WebApplication1.Models.Entities.User", "User")
                         .WithMany()
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Purpose");
 
                     b.Navigation("User");
                 });
@@ -335,15 +366,53 @@ namespace WebApplication1.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Entities.User", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Entities.AvailableAvatar", "Avatar")
+                        .WithMany("Users")
+                        .HasForeignKey("AvatarId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("WebApplication1.Models.Entities.Role", "Role")
+                        .WithMany("Users")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Avatar");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Entities.UserRating", b =>
                 {
                     b.HasOne("WebApplication1.Models.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
+                        .WithOne("Rating")
+                        .HasForeignKey("WebApplication1.Models.Entities.UserRating", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Entities.AvailableAvatar", b =>
+                {
+                    b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Entities.OtpPurpose", b =>
+                {
+                    b.Navigation("OtpCodes");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Entities.Role", b =>
+                {
+                    b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Entities.User", b =>
+                {
+                    b.Navigation("Rating");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,0 +1,318 @@
+﻿@model WebApplication1.Models.ViewModels.LearningContentViewModel
+@using System.Text.Json
+
+@{
+    var topicsJson = JsonSerializer.Serialize(Model.Topics, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
+}
+
+<div class="lc-layout">
+
+    <div class="lc-col" id="col-topics">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Темы</h3>
+                <span class="lc-sublabel" id="topics-count-label">@Model.Topics.Count шт.</span>
+            </div>
+            <button class="lc-add-btn" id="btn-add-topic">
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+
+        <div class="lc-list" id="topics-list">
+            @if (!Model.Topics.Any())
+            {
+                <div class="lc-empty-state">
+                    <i class="fa fa-folder-open"></i>
+                    <p>Тем пока нет. Добавьте первую.</p>
+                </div>
+            }
+            else
+            {
+                foreach (var topic in Model.Topics)
+                {
+                    <div class="lc-item" data-id="@topic.Id">
+                        <div class="lc-item-info">
+                            <span class="lc-item-order">#@topic.DisplayOrder</span>
+                            <span class="lc-item-name">@topic.Name</span>
+                            @if (!string.IsNullOrEmpty(topic.Description))
+                            {
+                                <span class="lc-item-desc">@topic.Description</span>
+                            }
+                        </div>
+                        <div class="lc-item-meta">
+                            <span class="lc-badge">@topic.Levels.Count ур.</span>
+                        </div>
+                        <div class="lc-item-actions">
+                            <button class="lc-icon-btn lc-view" title="Просмотр"
+                                    onclick="viewTopic(@topic.Id)">
+                                <i class="fa fa-eye"></i>
+                            </button>
+                            <button class="lc-icon-btn lc-edit" title="Редактировать"
+                                    onclick="editTopic(@topic.Id)">
+                                <i class="fa fa-pen"></i>
+                            </button>
+                            <button class="lc-icon-btn lc-delete" title="Удалить"
+                                    onclick="deleteTopic(@topic.Id, '@topic.Name.Replace("'", "\\'")', @topic.Levels.Count)">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                        <button class="lc-select-btn"
+                                onclick="selectTopic(@topic.Id, '@topic.Name.Replace("'", "\\'")')">
+                            Уровни <i class="fa fa-chevron-right"></i>
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="lc-col lc-col--locked" id="col-levels">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Уровни</h3>
+                <span class="lc-sublabel" id="levels-topic-label">Выберите тему</span>
+            </div>
+            <button class="lc-add-btn" id="btn-add-level" disabled>
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+
+        <div class="lc-list" id="levels-list">
+            <div class="lc-empty-state">
+                <i class="fa fa-layer-group"></i>
+                <p>Выберите тему слева, чтобы увидеть её уровни</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="lc-col lc-col--locked" id="col-theory">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Теория</h3>
+                <span class="lc-sublabel" id="theory-level-label">Выберите уровень</span>
+            </div>
+            <button class="lc-add-btn" id="btn-add-theory" disabled>
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+
+        <div class="lc-list" id="theory-list">
+            <div class="lc-empty-state">
+                <i class="fa fa-book-open"></i>
+                <p>Выберите уровень, чтобы управлять его теорией</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-topic">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4 id="modal-topic-title">Новая тема</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-topic')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="topic-id" value="0" />
+            <div class="lc-field">
+                <label>Название <span class="req">*</span></label>
+                <input type="text" id="topic-name" maxlength="255"
+                       placeholder="Введите название темы" />
+            </div>
+            <div class="lc-field">
+                <label>Описание</label>
+                <textarea id="topic-description" rows="3"
+                          placeholder="Краткое описание темы (необязательно)"></textarea>
+            </div>
+            <div class="lc-field lc-field--short">
+                <label>Порядок отображения</label>
+                <input type="number" id="topic-order" min="0" value="0" />
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-topic')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="saveTopic()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-level">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4 id="modal-level-title">Новый уровень</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-level')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="level-id" value="0" />
+            <div class="lc-field lc-field--row">
+                <div class="lc-field">
+                    <label>Тема <span class="req">*</span></label>
+                    <select id="level-topic-select"></select>
+                </div>
+                <div class="lc-field lc-field--short">
+                    <label>Номер уровня</label>
+                    <input type="number" id="level-number" min="1" value="1" />
+                </div>
+            </div>
+            <div class="lc-field">
+                <label>Название <span class="req">*</span></label>
+                <input type="text" id="level-name" maxlength="255"
+                       placeholder="Введите название уровня" />
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-level')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="saveLevel()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-theory">
+    <div class="lc-modal lc-modal--wide">
+        <div class="lc-modal-header">
+            <h4 id="modal-theory-title">Теория уровня</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-theory')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="theory-id" value="0" />
+            <input type="hidden" id="theory-level-id" value="0" />
+            <div class="lc-field">
+                <label>Заголовок <span class="req">*</span></label>
+                <input type="text" id="theory-title" maxlength="500"
+                       placeholder="Введите заголовок теории" />
+            </div>
+            <div class="lc-field">
+                <label>Содержимое <span class="req">*</span></label>
+                <textarea id="theory-content" rows="12"
+                          placeholder="Введите теоретический материал..."></textarea>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-theory')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="saveTheory()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-view-topic">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4>Тема</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-view-topic')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <div class="lc-view-row">
+                <span class="lc-view-label">Название</span>
+                <span class="lc-view-value" id="view-topic-name"></span>
+            </div>
+            <div class="lc-view-row">
+                <span class="lc-view-label">Описание</span>
+                <span class="lc-view-value lc-view-value--muted" id="view-topic-desc"></span>
+            </div>
+            <div class="lc-view-row">
+                <span class="lc-view-label">Порядок отображения</span>
+                <span class="lc-view-value" id="view-topic-order"></span>
+            </div>
+            <div class="lc-view-row">
+                <span class="lc-view-label">Уровней в теме</span>
+                <span class="lc-view-value" id="view-topic-levels"></span>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-view-topic')">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-view-level">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4>Уровень</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-view-level')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <div class="lc-view-row">
+                <span class="lc-view-label">Название</span>
+                <span class="lc-view-value" id="view-level-name"></span>
+            </div>
+            <div class="lc-view-row">
+                <span class="lc-view-label">Номер уровня</span>
+                <span class="lc-view-value" id="view-level-number"></span>
+            </div>
+            <div class="lc-view-row">
+                <span class="lc-view-label">Тема</span>
+                <span class="lc-view-value" id="view-level-topic"></span>
+            </div>
+            <div class="lc-view-row">
+                <span class="lc-view-label">Теория</span>
+                <span class="lc-view-value" id="view-level-theory"></span>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-view-level')">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-view-theory">
+    <div class="lc-modal lc-modal--wide">
+        <div class="lc-modal-header">
+            <h4>Теория уровня</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-view-theory')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <div class="lc-view-row">
+                <span class="lc-view-label">Заголовок</span>
+                <span class="lc-view-value" id="view-theory-title"></span>
+            </div>
+            <div class="lc-view-row lc-view-row--full">
+                <span class="lc-view-label">Содержимое</span>
+                <pre class="lc-view-content" id="view-theory-content"></pre>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-view-theory')">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="modal-confirm">
+    <div class="lc-modal lc-modal--sm">
+        <div class="lc-modal-header">
+            <h4>Подтверждение удаления</h4>
+            <button class="lc-modal-close" onclick="closeModal('modal-confirm')">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="lc-modal-body">
+            <p id="confirm-text" style="margin:0; color:#374151; font-size:14px;"></p>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('modal-confirm')">Отмена</button>
+            <button class="lc-btn lc-btn--danger" id="btn-confirm-action">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<div id="lc-toast" class="lc-toast"></div>
+
+@Html.AntiForgeryToken()
+
+<script>
+    const ALL_TOPICS = @Html.Raw(topicsJson);
+    const LC_TOKEN   = document.querySelector('input[name="__RequestVerificationToken"]').value;
+</script>

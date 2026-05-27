@@ -58,7 +58,7 @@ namespace WebApplication1.Filters
                 context.Result = new ObjectResult(new
                 {
                     success = false,
-                    error = $"Слишком много запросов. Максимум {_maxRequests} запросов за {_timeWindowMinutes} минут.",
+                    error = $"Слишком много запросов. Максимум {_maxRequests} запросов за {_timeWindowMinutes} минут",
                     retryAfter = requests.Min().AddMinutes(_timeWindowMinutes) - now
                 })
                 {

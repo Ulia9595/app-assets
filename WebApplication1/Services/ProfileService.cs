@@ -10,10 +10,14 @@ namespace WebApplication1.Services
     public class ProfileService
     {
         private readonly AppDbContext _context;
+        private readonly UsernameService _usernameService;
 
-        public ProfileService(AppDbContext context)
+        public ProfileService(
+            AppDbContext context,
+            UsernameService usernameService)
         {
             _context = context;
+            _usernameService = usernameService;
         }
 
         public async Task<ApiResponse<UserResponse>> GetProfileAsync(string uid)
@@ -21,6 +25,9 @@ namespace WebApplication1.Services
             Console.WriteLine($"GetProfileAsync вызван для UID: {uid}");
 
             var user = await _context.Users
+                .Include(u => u.Role)
+                .Include(u => u.Avatar)
+                .Include(u => u.Rating)
                 .FirstOrDefaultAsync(u => u.Uid == uid);
 
             if (user == null)
@@ -29,20 +36,15 @@ namespace WebApplication1.Services
                 return ApiResponse<UserResponse>.Fail("Пользователь не найден");
             }
 
-            Console.WriteLine($"Пользователь найден:");
-            Console.WriteLine($"Имя: '{user.Name}'");
-            Console.WriteLine($"Аватар: '{user.AvatarUrl}'");
-            Console.WriteLine($"Email: '{user.Email}'");
-            Console.WriteLine($"ELO: {user.EloPoints}");
-
             var response = new UserResponse
             {
                 Uid = user.Uid!,
                 Email = user.Email,
+                Role = user.Role.Code,
                 Name = user.Name,
-                AvatarUrl = user.AvatarUrl,
-                EloPoints = user.EloPoints,
-                IsEmailVerified = user.IsEmailVerified
+                AvatarId = user.AvatarId,
+                AvatarUrl = user.Avatar?.Url,
+                EloPoints = user.Rating?.CurrentRating ?? 500
             };
 
             return ApiResponse<UserResponse>.Ok(response);
@@ -51,15 +53,21 @@ namespace WebApplication1.Services
         public async Task<User?> GetUserById(int userId)
         {
             return await _context.Users
+                .Include(u => u.Role)
+                .Include(u => u.Avatar)
+                .Include(u => u.Rating)
                 .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
         public async Task<ApiResponse<UserResponse>> UpdateProfileAsync(string uid, UpdateProfileRequest request)
         {
             Console.WriteLine($"UpdateProfileAsync вызван для UID={uid}");
-            Console.WriteLine($"Новое имя: {request.Name}, Новый аватар: {request.AvatarUrl}");
+            Console.WriteLine($"Новое имя: {request.Name}, Новый AvatarId: {request.AvatarId}");
 
             var user = await _context.Users
+                .Include(u => u.Role)
+                .Include(u => u.Avatar)
+                .Include(u => u.Rating)
                 .FirstOrDefaultAsync(u => u.Uid == uid);
 
             if (user == null)
@@ -68,62 +76,72 @@ namespace WebApplication1.Services
                 return ApiResponse<UserResponse>.Fail("Пользователь не найден");
             }
 
-            if (!string.IsNullOrEmpty(request.Name))
-                user.Name = request.Name;
+            if (user.Role.Code == "admin")
+                return ApiResponse<UserResponse>.Fail("Администратор не может изменять профиль");
 
-            if (!string.IsNullOrEmpty(request.AvatarUrl))
-                user.AvatarUrl = request.AvatarUrl;
+            if (!string.IsNullOrWhiteSpace(request.Name))
+            {
+                var usernameCheck = await _usernameService.ValidateAndCheckUsernameAsync(
+                    request.Name,
+                    currentUserId: uid
+                );
 
-            user.UpdatedAt = DateTime.UtcNow;
-            Console.WriteLine($"Сохраняем изменения в БД...");
+                if (!usernameCheck.Success)
+                    return ApiResponse<UserResponse>.Fail(usernameCheck.Error ?? "Некорректное имя пользователя");
+
+                user.Name = request.Name.Trim();
+            }
+
+            if (request.AvatarId.HasValue)
+            {
+                var avatarExists = await _context.AvailableAvatars
+                    .AnyAsync(a => a.Id == request.AvatarId.Value);
+
+                if (!avatarExists)
+                    return ApiResponse<UserResponse>.Fail("Выбранный аватар не найден");
+
+                user.AvatarId = request.AvatarId.Value;
+            }
+
+            Console.WriteLine("Сохраняем изменения в БД...");
             await _context.SaveChangesAsync();
 
             Console.WriteLine($"Обновление профиля завершено для UID={uid}");
             return await GetProfileAsync(uid);
         }
 
-        public async Task<ApiResponse<List<string>>> GetAvailableAvatarsAsync()
+        public async Task<ApiResponse<List<AvatarResponse>>> GetAvailableAvatarsAsync()
         {
             try
             {
                 var avatars = await _context.AvailableAvatars
                     .OrderBy(a => a.DisplayOrder)
-                    .Select(a => a.Url)
+                    .Select(a => new AvatarResponse
+                    {
+                        Id = a.Id,
+                        Url = a.Url,
+                        DisplayOrder = a.DisplayOrder
+                    })
                     .ToListAsync();
 
-                if (avatars.Any())
-                {
-                    return ApiResponse<List<string>>.Ok(avatars);
-                }
-
-                return ApiResponse<List<string>>.Ok(GetDefaultAvatars());
+                return ApiResponse<List<AvatarResponse>>.Ok(avatars);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка EF при получении аватаров: {ex.Message}");
-                return ApiResponse<List<string>>.Ok(GetDefaultAvatars());
+                return ApiResponse<List<AvatarResponse>>.Fail("Ошибка получения списка аватаров");
             }
-        }
-
-        private List<string> GetDefaultAvatars()
-        {
-            return new List<string>
-            {
-                "https://raw.githubusercontent.com/Ulia9595/app-assets/main/avatars/Cat_1.jpg",
-                "https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_2.jpg?raw=true",
-                "https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_3.jpg?raw=true",
-                "https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_4.jpg?raw=true",
-                "https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_5.jpg?raw=true",
-                "https://github.com/Ulia9595/app-assets/blob/main/avatars/Cat_6.jpg?raw=true"
-            };
         }
 
         public async Task<ApiResponse<UserResponse>> CompleteRegistrationAsync(string uid, CompleteRegistrationRequest request)
         {
             Console.WriteLine($"CompleteRegistrationAsync вызван для UID={uid}");
-            Console.WriteLine($"Имя: {request.Name}, Аватар: {request.AvatarUrl}");
+            Console.WriteLine($"Имя: {request.Name}, AvatarId: {request.AvatarId}");
 
             var user = await _context.Users
+                .Include(u => u.Role)
+                .Include(u => u.Avatar)
+                .Include(u => u.Rating)
                 .FirstOrDefaultAsync(u => u.Uid == uid);
 
             if (user == null)
@@ -132,11 +150,31 @@ namespace WebApplication1.Services
                 return ApiResponse<UserResponse>.Fail("Пользователь не найден");
             }
 
-            user.Name = request.Name;
-            user.AvatarUrl = request.AvatarUrl;
-            user.UpdatedAt = DateTime.UtcNow;
+            if (user.Role.Code == "admin")
+                return ApiResponse<UserResponse>.Fail("Администратор не проходит завершение регистрации игрока");
 
-            Console.WriteLine($"Сохраняем изменения в БД...");
+            var usernameCheck = await _usernameService.ValidateAndCheckUsernameAsync(
+                request.Name,
+                currentUserId: uid
+            );
+
+            if (!usernameCheck.Success)
+                return ApiResponse<UserResponse>.Fail(usernameCheck.Error ?? "Некорректное имя пользователя");
+
+            user.Name = request.Name.Trim();
+
+            if (request.AvatarId.HasValue)
+            {
+                var avatarExists = await _context.AvailableAvatars
+                    .AnyAsync(a => a.Id == request.AvatarId.Value);
+
+                if (!avatarExists)
+                    return ApiResponse<UserResponse>.Fail("Выбранный аватар не найден");
+
+                user.AvatarId = request.AvatarId.Value;
+            }
+
+            Console.WriteLine("Сохраняем изменения в БД...");
             await _context.SaveChangesAsync();
 
             Console.WriteLine($"Завершение регистрации завершено для UID={uid}");
@@ -145,16 +183,12 @@ namespace WebApplication1.Services
 
         public async Task<ApiResponse<bool>> IsUsernameUniqueAsync(string username, string? currentUid)
         {
-            if (string.IsNullOrWhiteSpace(username))
-                return ApiResponse<bool>.Fail("Имя не может быть пустым");
+            return await _usernameService.IsUsernameUniqueAsync(username, currentUid);
+        }
 
-            var exists = await _context.Users.AnyAsync(u =>
-                u.Name != null &&
-                u.Name.ToLower() == username.ToLower() &&
-                (currentUid == null || u.Uid != currentUid)
-            );
-
-            return ApiResponse<bool>.Ok(!exists);
+        public async Task<ApiResponse<bool>> CheckUsernameAsync(string username, string? currentUid)
+        {
+            return await _usernameService.ValidateAndCheckUsernameAsync(username, currentUid);
         }
     }
 }

@@ -11,10 +11,6 @@ namespace WebApplication1.Models.Entities
         [Column("id")]
         public int Id { get; set; }
 
-        [Column("category")]
-        [MaxLength(50)]
-        public string Category { get; set; } = "cats";
-
         [Column("url")]
         [Required]
         public string Url { get; set; } = string.Empty;
@@ -22,7 +18,6 @@ namespace WebApplication1.Models.Entities
         [Column("display_order")]
         public int DisplayOrder { get; set; } = 0;
 
-        [Column("created_at")]
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public ICollection<User> Users { get; set; } = new List<User>();
     }
 }

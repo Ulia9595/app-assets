@@ -22,6 +22,8 @@ namespace WebApplication1.Services
 
     public class PasswordValidator
     {
+        private const string SpecialChars = "!@#$%^&*+=";
+
         public ValidationResult GetDetailedValidation(string password)
         {
             if (string.IsNullOrEmpty(password))
@@ -33,7 +35,8 @@ namespace WebApplication1.Services
                     {
                         ["Минимум 8 символов"] = false,
                         ["Заглавная буква"] = false,
-                        ["Цифра и спецсимвол"] = false
+                        ["Цифра"] = false,
+                        ["Спецсимвол"] = false
                     },
                     Strength = PasswordStrength.Empty
                 };
@@ -43,8 +46,8 @@ namespace WebApplication1.Services
             {
                 ["Минимум 8 символов"] = password.Length >= 8,
                 ["Заглавная буква"] = password.Any(char.IsUpper),
-                ["Цифра и спецсимвол"] = password.Any(char.IsDigit) &&
-                                         password.Any(c => "@#$%^&+=!".Contains(c))
+                ["Цифра"] = password.Any(char.IsDigit),
+                ["Спецсимвол"] = password.Any(c => SpecialChars.Contains(c))
             };
 
             var isValid = requirements.Values.All(v => v);
@@ -68,7 +71,8 @@ namespace WebApplication1.Services
 
             if (metCount <= 1)
                 return PasswordStrength.Weak;
-            if (metCount == 2)
+
+            if (metCount == 2 || metCount == 3)
                 return PasswordStrength.Medium;
 
             return PasswordStrength.Strong;

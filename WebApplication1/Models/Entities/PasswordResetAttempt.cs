@@ -23,16 +23,5 @@ namespace WebApplication1.Models.Entities
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-        [Column("blocked")]
-        public bool Blocked { get; set; } = false;
-
-        [Column("block_reason")]
-        [MaxLength(100)]
-        public string? BlockReason { get; set; }
-
-        [Column("user_agent")]
-        [MaxLength(500)]
-        public string? UserAgent { get; set; }
     }
 }

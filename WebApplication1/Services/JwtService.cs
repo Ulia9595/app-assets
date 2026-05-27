@@ -14,7 +14,7 @@ namespace WebApplication1.Services
             _configuration = configuration;
         }
 
-        public string GenerateToken(int userId, string email, string uid)
+        public string GenerateToken(int userId, string email, string uid, string role)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
@@ -30,11 +30,12 @@ namespace WebApplication1.Services
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim(ClaimTypes.Email, email),
-            new Claim(JwtRegisteredClaimNames.Jti, uid),
-            new Claim("uid", uid)
-        }),
+                    new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                    new Claim(ClaimTypes.Email, email),
+                    new Claim(JwtRegisteredClaimNames.Jti, uid),
+                    new Claim("uid", uid),
+                    new Claim(ClaimTypes.Role, role)
+                }),
                 Expires = DateTime.UtcNow.AddDays(7),
                 Issuer = issuer,
                 Audience = audience,
@@ -85,6 +86,12 @@ namespace WebApplication1.Services
                 return null;
 
             return userId;
+        }
+
+        public string? GetUserRoleFromToken(string token)
+        {
+            var principal = ValidateToken(token);
+            return principal?.FindFirst(ClaimTypes.Role)?.Value;
         }
     }
 }

@@ -172,8 +172,8 @@ namespace WebApplication1.Services
                 if (_settings.TestMode)
                 {
                     _logger.LogInformation($"TEST MODE: Reset token для {toEmail}: {resetToken}");
-                    Console.WriteLine($"📧 TEST: Reset token для {toEmail}: {resetToken}");
-                    Console.WriteLine($"📧 TEST: Reset link: {resetLink}");
+                    Console.WriteLine($"TEST: Reset token для {toEmail}: {resetToken}");
+                    Console.WriteLine($"TEST: Reset link: {resetLink}");
 
                     return true;
                 }
@@ -191,7 +191,7 @@ namespace WebApplication1.Services
                                       color: white; text-decoration: none; border-radius: 5px; 
                                       margin: 10px 0; }}
                             .token-box {{ background: #f8f9fa; padding: 15px; border-radius: 5px; 
-                                         border-left: 4px solid #4CAF50; margin: 15px 0; 
+                                          margin: 15px 0; 
                                          font-family: monospace; word-break: break-all; }}
                             .warning {{ background: #fff3cd; color: #856404; padding: 10px; 
                                         border-radius: 5px; margin: 15px 0; }}
@@ -287,9 +287,9 @@ namespace WebApplication1.Services
                     <body>
                         <div class='container'>
                             <h3>Здравствуйте, {userName}!</h3>
-                            <p>Добро пожаловать в наше игровое приложение! 🎮</p>
+                            <p>Добро пожаловать в наше игровое приложение!</p>
                             <p>Мы рады, что вы присоединились к нашему сообществу.</p>
-                            <p>Желаем удачи в играх и высоких рейтингов! 🏆</p>
+                            <p>Желаем удачи в играх и высоких рейтингов!</p>
                             <br>
                             <p>С уважением,<br><strong>{_settings.SenderName}</strong></p>
                         </div>

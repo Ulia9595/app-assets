@@ -41,15 +41,21 @@ namespace WebApplication1.Controllers
                 }
 
                 var resetToken = await _context.PasswordResetTokens
-                    .Include(t => t.User)
-                    .FirstOrDefaultAsync(t => t.Token == token &&
-                                             t.Used == false &&
-                                             t.ExpiresAt > DateTime.UtcNow);
+                                                .Include(t => t.User)
+                                                .ThenInclude(u => u.Role)
+                                                .FirstOrDefaultAsync(t => t.Token == token &&
+                                                                     t.Used == false &&
+                                                                     t.ExpiresAt > DateTime.UtcNow);
 
                 if (resetToken == null)
                 {
                     _logger.LogWarning($"Невалидный токен сброса пароля: {token}");
                     return Redirect($"/static/reset-invalid.html?message={Uri.EscapeDataString("Токен недействителен, просрочен или уже использован")}");
+                }
+
+                if (resetToken.User.Role.Code == "admin")
+                {
+                    return Redirect($"/static/reset-invalid.html?message={Uri.EscapeDataString("Администратор не может менять пароль")}");
                 }
 
                 var frontendUrl = _configuration["EmailSettings:FrontendUrl"] ??
@@ -112,9 +118,6 @@ namespace WebApplication1.Controllers
                 if (result.Success)
                 {
                     _logger.LogInformation($"Пароль успешно сброшен по токену: {token}");
-
-                    resetToken.Used = true;
-                    await _context.SaveChangesAsync();
 
                     return Ok(new
                     {

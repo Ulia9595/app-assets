@@ -1,0 +1,262 @@
+﻿@model WebApplication1.Models.ViewModels.PvpContentViewModel
+@using System.Text.Json
+
+@{
+    var tournamentsJson = JsonSerializer.Serialize(Model.Tournaments, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var questionsJson = JsonSerializer.Serialize(Model.Questions, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var topicsJson = JsonSerializer.Serialize(Model.Topics, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var statusesJson = JsonSerializer.Serialize(Model.Statuses, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var difficultiesJson = JsonSerializer.Serialize(Model.DifficultyTypes, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="lc-layout lc-layout--pvp">
+
+    <div class="lc-col" id="pv-col-tournaments">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Турниры</h3>
+                <span class="lc-sublabel" id="pv-tournaments-count">@Model.Tournaments.Count шт.</span>
+            </div>
+            <button class="lc-add-btn" id="pv-btn-add-tournament">
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+        <div class="lc-list" id="pv-tournaments-list">
+            @if (!Model.Tournaments.Any())
+            {
+                <div class="lc-empty-state">
+                    <i class="fa fa-trophy"></i>
+                    <p>Турниров пока нет</p>
+                </div>
+            }
+            else
+            {
+                foreach (var t in Model.Tournaments)
+                {
+                    <div class="lc-item" data-id="@t.Id">
+                        <div class="lc-item-info">
+                            <span class="lc-item-order">#@t.Id</span>
+                            <span class="lc-item-name">@t.TopicName</span>
+                        </div>
+                        <div class="lc-item-meta">
+                            <span class="lc-badge @(t.StatusName == "В процессе" ? "lc-badge--green" : t.StatusName == "Завершён" ? "lc-badge--gray" : "lc-badge--blue")">
+                                @t.StatusName
+                            </span>
+                        </div>
+                        <div class="lc-item-actions">
+                            <button class="lc-icon-btn lc-edit" title="Редактировать"
+                                    onclick="pvEditTournament(@t.Id)">
+                                <i class="fa fa-pen"></i>
+                            </button>
+                            <button class="lc-icon-btn lc-delete" title="Удалить"
+                                    onclick="pvDeleteTournament(@t.Id, '@t.TopicName.Replace("'", "\\'")')">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                        <button class="lc-select-btn"
+                                onclick="pvSelectTournament(@t.Id, '@t.TopicName.Replace("'", "\\'")')">
+                            Вопросы <i class="fa fa-chevron-right"></i>
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="lc-col lc-col--locked" id="pv-col-tquestions">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Вопросы турнира</h3>
+                <span class="lc-sublabel" id="pv-tournament-label">Выберите турнир</span>
+            </div>
+        </div>
+        <div class="lc-list" id="pv-tquestions-list">
+            <div class="lc-empty-state">
+                <i class="fa fa-list-ol"></i>
+                <p>Выберите турнир слева</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="lc-col" id="pv-col-questions">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Банк вопросов</h3>
+                <span class="lc-sublabel" id="pv-questions-count">@Model.Questions.Count шт.</span>
+            </div>
+            <button class="lc-add-btn" id="pv-btn-add-question">
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+        <div class="lc-list" id="pv-questions-list">
+            @if (!Model.Questions.Any())
+            {
+                <div class="lc-empty-state">
+                    <i class="fa fa-question-circle"></i>
+                    <p>Вопросов пока нет</p>
+                </div>
+            }
+            else
+            {
+                foreach (var q in Model.Questions)
+                {
+                    <div class="lc-item" data-id="@q.Id">
+                        <div class="lc-item-info">
+                            <span class="lc-item-order">@q.TopicName</span>
+                            <span class="lc-item-name">@(q.QuestionText.Length > 60 ? q.QuestionText.Substring(0, 60) + "…" : q.QuestionText)</span>
+                        </div>
+                        <div class="lc-item-meta">
+                            <span class="lc-badge @(q.DifficultyTypeName == "Лёгкий" ? "lc-badge--green" : q.DifficultyTypeName == "Сложный" ? "lc-badge--red" : "lc-badge--blue")">
+                                @q.DifficultyTypeName
+                            </span>
+                            <span class="lc-badge lc-badge--gray">@q.AnswerOptions.Count отв.</span>
+                        </div>
+                        <div class="lc-item-actions">
+                            <button class="lc-icon-btn lc-edit" title="Редактировать"
+                                    onclick="pvEditQuestion(@q.Id)">
+                                <i class="fa fa-pen"></i>
+                            </button>
+                            <button class="lc-icon-btn lc-delete" title="Удалить"
+                                    onclick="pvDeleteQuestion(@q.Id)">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                        <button class="lc-select-btn"
+                                onclick="pvSelectQuestion(@q.Id)">
+                            Ответы <i class="fa fa-chevron-right"></i>
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="lc-col lc-col--locked" id="pv-col-answers">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Варианты ответов</h3>
+                <span class="lc-sublabel" id="pv-question-label">Выберите вопрос</span>
+            </div>
+            <button class="lc-add-btn" id="pv-btn-add-answer" disabled>
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+        <div class="lc-list" id="pv-answers-list">
+            <div class="lc-empty-state">
+                <i class="fa fa-check-circle"></i>
+                <p>Выберите вопрос справа</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="pv-modal-tournament">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4 id="pv-modal-tournament-title">Новый турнир</h4>
+            <button class="lc-modal-close" onclick="closeModal('pv-modal-tournament')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="pv-tournament-id" value="0" />
+            <div class="lc-field">
+                <label>Тема <span class="req">*</span></label>
+                <select id="pv-tournament-topic"></select>
+            </div>
+            <div class="lc-field" id="pv-tournament-status-field" style="display:none">
+                <label>Статус</label>
+                <select id="pv-tournament-status"></select>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('pv-modal-tournament')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="pvSaveTournament()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="pv-modal-question">
+    <div class="lc-modal lc-modal--wide">
+        <div class="lc-modal-header">
+            <h4 id="pv-modal-question-title">Новый вопрос</h4>
+            <button class="lc-modal-close" onclick="closeModal('pv-modal-question')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="pv-question-id" value="0" />
+            <div class="lc-field lc-field--row">
+                <div class="lc-field">
+                    <label>Тема <span class="req">*</span></label>
+                    <select id="pv-question-topic"></select>
+                </div>
+                <div class="lc-field">
+                    <label>Сложность <span class="req">*</span></label>
+                    <select id="pv-question-difficulty"></select>
+                </div>
+            </div>
+            <div class="lc-field">
+                <label>Текст вопроса <span class="req">*</span></label>
+                <textarea id="pv-question-text" rows="4" placeholder="Введите текст вопроса..."></textarea>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('pv-modal-question')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="pvSaveQuestion()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="pv-modal-answer">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4 id="pv-modal-answer-title">Новый вариант ответа</h4>
+            <button class="lc-modal-close" onclick="closeModal('pv-modal-answer')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="pv-answer-id" value="0" />
+            <input type="hidden" id="pv-answer-question-id" value="0" />
+            <div class="lc-field">
+                <label>Текст ответа <span class="req">*</span></label>
+                <textarea id="pv-answer-text" rows="3" placeholder="Введите вариант ответа..."></textarea>
+            </div>
+            <div class="lc-field">
+                <label class="tk-checkbox-label">
+                    <input type="checkbox" id="pv-answer-correct" />
+                    Правильный ответ
+                </label>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('pv-modal-answer')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="pvSaveAnswer()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="pv-modal-confirm">
+    <div class="lc-modal lc-modal--sm">
+        <div class="lc-modal-header">
+            <h4>Подтверждение удаления</h4>
+            <button class="lc-modal-close" onclick="closeModal('pv-modal-confirm')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <p id="pv-confirm-text" style="margin:0;color:#374151;font-size:14px;"></p>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('pv-modal-confirm')">Отмена</button>
+            <button class="lc-btn lc-btn--danger" id="pv-btn-confirm">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-toast" id="pv-toast"></div>
+
+
+@Html.AntiForgeryToken()
+
+<script>
+    const PV_TOURNAMENTS  = @Html.Raw(tournamentsJson);
+    const PV_QUESTIONS    = @Html.Raw(questionsJson);
+    const PV_TOPICS       = @Html.Raw(topicsJson);
+    const PV_STATUSES     = @Html.Raw(statusesJson);
+    const PV_DIFFICULTIES = @Html.Raw(difficultiesJson);
+    const PV_TOKEN        = document.querySelector('input[name="__RequestVerificationToken"]').value;
+</script>

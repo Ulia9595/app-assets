@@ -1,0 +1,64 @@
+﻿@model WebApplication1.Models.ViewModels.UsersContentViewModel
+@using System.Text.Json
+
+@{
+    var usersJson = JsonSerializer.Serialize(Model.Users, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var today = DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<div class="up-toolbar">
+    <div class="up-filters">
+        <input type="text" id="up-search" placeholder="Поиск по нику..." />
+        <input type="date" id="up-date-from" max="@today" title="Дата регистрации от" />
+        <input type="date" id="up-date-to" max="@today" title="Дата регистрации до" />
+        <button class="lc-btn lc-btn--ghost lc-btn--sm" onclick="upResetFilters()">
+            <i class="fa fa-times"></i> Сбросить
+        </button>
+        <span class="lc-sublabel" id="up-count-label">@Model.Users.Count польз.</span>
+    </div>
+</div>
+
+<div class="up-table-wrap">
+    <table class="up-table">
+        <thead>
+            <tr>
+                <th>Ник</th>
+                <th>ELO</th>
+                <th>Дата регистрации</th>
+                <th>Решено заданий</th>
+                <th>Тем завершено</th>
+                <th>Уровней завершено</th>
+                <th>Турниров сыграно</th>
+            </tr>
+        </thead>
+        <tbody id="up-table-body">
+            @foreach (var u in Model.Users)
+            {
+                <tr data-name="@u.DisplayName.ToLower()" data-date="@u.CreatedAt.ToString("yyyy-MM-dd")">
+                    <td class="up-td-name">@u.DisplayName</td>
+                    <td class="up-td-rating">
+                        <span class="lc-badge @(u.CurrentRating >= 800 ? "lc-badge--green" : u.CurrentRating >= 500 ? "lc-badge--blue" : "lc-badge--gray")">
+                            @u.CurrentRating
+                        </span>
+                    </td>
+                    <td class="up-td-date">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
+                    <td class="up-td-num">@u.SolvedTasksCount</td>
+                    <td class="up-td-num">@u.CompletedTopicsCount / @Model.TotalTopics</td>
+                    <td class="up-td-num">@u.CompletedLevelsCount / @Model.TotalLevels</td>
+                    <td class="up-td-num">@u.TournamentsPlayedCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (!Model.Users.Any())
+    {
+        <div class="lc-empty-state">
+            <i class="fa fa-users"></i>
+            <p>Пользователей пока нет</p>
+        </div>
+    }
+</div>
+
+<script>
+    const UP_USERS = @Html.Raw(usersJson);
+</script>

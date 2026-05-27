@@ -6,202 +6,59 @@
     <title>Недействительный токен | Game Auth</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <style>
-        :root {
-            --gradient-danger: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            margin: 0;
-        }
-
-        .error-container {
-            max-width: 600px;
-            width: 100%;
-            animation: slideUp 0.5s ease-out;
-        }
-
-        .error-card {
-            background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(220, 53, 69, 0.1);
-            border: none;
-        }
-
-        .error-header {
-            background: var(--gradient-danger);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-        }
-
-        .error-icon {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            animation: pulse 2s infinite;
-        }
-
-            .error-icon i {
-                font-size: 36px;
-            }
-
-        .error-body {
-            padding: 40px 30px;
-            text-align: center;
-        }
-
-        .error-title {
-            color: #dc3545;
-            font-weight: 700;
-            font-size: 1.8rem;
-            margin-bottom: 15px;
-        }
-
-        .error-message {
-            color: #666;
-            font-size: 1.1rem;
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }
-
-        .token-info {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 20px 0;
-            border-left: 4px solid #dc3545;
-        }
-
-            .token-info code {
-                font-family: 'Courier New', monospace;
-                color: #dc3545;
-                font-size: 0.9rem;
-                word-break: break-all;
-            }
-
-        .actions {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 30px;
-        }
-
-        .btn-danger {
-            background: var(--gradient-danger);
-            border: none;
-            padding: 14px 24px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-            .btn-danger:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
-            }
-
-        .btn-outline-danger {
-            padding: 14px 24px;
-            font-weight: 600;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3);
-            }
-
-            70% {
-                transform: scale(1.05);
-                box-shadow: 0 0 0 20px rgba(255, 255, 255, 0);
-            }
-
-            100% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-            }
-        }
-
-        @media (max-width: 576px) {
-            .error-body {
-                padding: 30px 20px;
-            }
-
-            .error-title {
-                font-size: 1.5rem;
-            }
-
-            .actions {
-                flex-direction: column;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="../css/common.css">
 </head>
 <body>
-    <div class="error-container">
-        <div class="error-card">
-            <div class="error-header">
-                <div class="error-icon">
-                    <i class="fas fa-exclamation-triangle"></i>
+    <div class="page-container">
+        <div class="card-custom card-error">
+
+            <div class="header header-error">
+                <div class="header-icon error">
+                    <i class="fas fa-exclamation-triangle text-white"></i>
                 </div>
                 <h1 class="h3 mb-0 fw-bold">Ошибка токена</h1>
             </div>
 
-            <div class="error-body">
-                <h2 class="error-title">Недействительный токен</h2>
+            <div class="body">
+                <h2 class="title-error">Недействительный токен</h2>
 
-                <p class="error-message">
-                    Токен сброса пароля недействителен, просрочен или уже использован.
-                </p>
+                <p class="message">Токен сброса пароля недействителен, просрочен или уже использован</p>
 
-                <div class="token-info">
-                    <p class="small mb-2"><strong>Возможные причины:</strong></p>
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-1">
-                            <i class="fas fa-clock text-danger me-2"></i>
+                <div class="info-box error">
+                    <h6>Возможные причины:</h6>
+
+                    <div class="tip-item">
+                        <div class="tip-icon error">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div class="tip-text">
                             Срок действия ссылки истёк (15 минут)
-                        </li>
-                        <li class="mb-1">
-                            <i class="fas fa-redo text-danger me-2"></i>
+                        </div>
+                    </div>
+
+                    <div class="tip-item">
+                        <div class="tip-icon error">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div class="tip-text">
                             Токен уже использован для сброса пароля
-                        </li>
-                        <li>
-                            <i class="fas fa-link text-danger me-2"></i>
+                        </div>
+                    </div>
+
+                    <div class="tip-item">
+                        <div class="tip-icon error">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div class="tip-text">
                             Неверная или повреждённая ссылка
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mt-4 pt-3 border-top small text-muted">
+                <div id="extra-error"></div>
+
+                <div class="mt-4 small info-note-error">
                     <div class="d-flex align-items-center justify-content-center">
                         <i class="fas fa-info-circle me-2"></i>
                         <span>Токены безопасности действительны в течение 15 минут</span>
@@ -210,17 +67,16 @@
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const errorMessage = urlParams.get('message');
 
         if (errorMessage) {
-            const errorMessageElement = document.createElement('div');
-            errorMessageElement.className = 'alert alert-light border mt-3';
-            errorMessageElement.innerHTML = `
+            const block = document.createElement('div');
+            block.className = 'alert alert-light border mt-3';
+
+            block.innerHTML = `
                 <div class="d-flex align-items-center">
                     <i class="fas fa-exclamation-circle text-warning me-2"></i>
                     <div>
@@ -230,15 +86,8 @@
                 </div>
             `;
 
-            document.querySelector('.token-info').after(errorMessageElement);
+            document.getElementById('extra-error').appendChild(block);
         }
-
-        setTimeout(() => {
-            const redirectBtn = document.querySelector('.btn-outline-danger');
-            if (redirectBtn) {
-                window.location.href = redirectBtn.href;
-            }
-        }, 30000);
     </script>
 </body>
 </html>

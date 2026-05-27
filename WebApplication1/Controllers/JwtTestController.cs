@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
@@ -19,7 +20,7 @@ namespace WebApplication1.Controllers
         public IActionResult GenerateToken()
         {
             string uid = Guid.NewGuid().ToString();
-            string token = _jwtService.GenerateToken(23, "ulyanacoroliova@yandex.ru", uid);
+            string token = _jwtService.GenerateToken(23, "ulyanacoroliova@yandex.ru", uid, "admin");
 
             return Ok(new { token });
         }
@@ -43,7 +44,8 @@ namespace WebApplication1.Controllers
                 {
                     ParsedClaims = claimsInfo,
                     IsValid = principal != null,
-                    UserId = principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    UserId = principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value,
+                    Role = principal?.FindFirst(ClaimTypes.Role)?.Value
                 });
             }
             catch (Exception ex)

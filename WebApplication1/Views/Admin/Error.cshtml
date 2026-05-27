@@ -1,0 +1,111 @@
+﻿@{
+    Layout = null;
+    var statusCode = Context.Response.StatusCode;
+}
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ошибка панели администратора</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0f172a;
+        }
+        .error-box {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 24px;
+            padding: 50px 40px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+        }
+        .error-box h1 {
+            font-size: 72px;
+            font-weight: 800;
+            color: #dc2626;
+            margin: 0;
+        }
+        .error-box h2 {
+            font-size: 24px;
+            margin: 16px 0 8px;
+            color: #111827;
+        }
+        .error-box p {
+            color: #64748b;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .error-box a {
+            display: inline-block;
+            margin-top: 28px;
+            padding: 12px 32px;
+            background: #2563eb;
+            color: #fff;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .error-box a:hover {
+            background: #1d4ed8;
+        }
+        .admin-link {
+            margin-top: 16px;
+            display: block;
+            font-size: 14px;
+            color: #64748b;
+        }
+        .admin-link a {
+            display: inline;
+            padding: 0;
+            background: none;
+            color: #2563eb;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .admin-link a:hover {
+            text-decoration: underline;
+            background: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-box">
+        <h1>@statusCode</h1>
+
+        @if (statusCode == 500 || statusCode == 503)
+        {
+            <h2>Сервер недоступен</h2>
+            <p>Извините, административная панель временно недоступна. Попробуйте обновить страницу позже.</p>
+        }
+        else if (statusCode == 404)
+        {
+            <h2>Страница не найдена</h2>
+            <p>Запрашиваемая страница не существует в панели администратора.</p>
+        }
+        else
+        {
+            <h2>Что-то пошло не так</h2>
+            <p>Произошла внутренняя ошибка сервера при загрузке панели администратора.</p>
+        }
+
+        <a href="/admin/dashboard">Попробовать снова</a>
+
+        <div class="admin-link">
+            <a href="/admin/login">Войти заново</a>
+        </div>
+    </div>
+</body>
+</html>

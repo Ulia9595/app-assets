@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Нет соединения</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0f172a;
+        }
+
+        .offline-box {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 24px;
+            padding: 50px 40px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+        }
+
+            .offline-box .icon {
+                font-size: 64px;
+                color: #94a3b8;
+                margin-bottom: 16px;
+            }
+
+            .offline-box h2 {
+                font-size: 24px;
+                margin: 0 0 8px;
+                color: #111827;
+            }
+
+            .offline-box p {
+                color: #64748b;
+                font-size: 15px;
+                line-height: 1.6;
+            }
+    </style>
+</head>
+<body>
+    <div class="offline-box">
+        <h2>Нет подключения к сети</h2>
+        <p>Проверьте интернет-соединение и попробуйте снова.</p>
+    </div>
+</body>
+</html>

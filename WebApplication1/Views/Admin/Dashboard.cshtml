@@ -1,0 +1,176 @@
+﻿@using System.Security.Claims
+@model WebApplication1.Models.ViewModels.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Личный кабинет администратора";
+
+    var email = User.FindFirst(ClaimTypes.Email)?.Value ?? "admin";
+    var adminName = email.Contains("@") ? email.Split('@')[0] : email;
+}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="~/css/admin-dashboard.css" />
+
+<div class="admin-layout">
+    <aside class="admin-sidebar" id="adminSidebar">
+        <div class="admin-sidebar-header">
+            <div>
+                <h2>Личный кабинет администратора</h2>
+                <span>@adminName</span>
+            </div>
+
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <line x1="5" y1="5" x2="19" y2="19" stroke-width="2" stroke-linecap="round" />
+                    <line x1="19" y1="5" x2="5" y2="19" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            </button>
+        </div>
+
+        <nav class="admin-menu">
+            <button type="button" class="menu-item active" data-section="dashboard">Панель управления</button>
+            <button type="button" class="menu-item" data-section="learning">Контент обучения</button>
+            <button type="button" class="menu-item" data-section="tasks">Задания</button>
+            <button type="button" class="menu-item" data-section="pvp">PvP-турниры</button>
+            <button type="button" class="menu-item" data-section="analytics">Аналитика</button>
+            <button type="button" class="menu-item" data-section="users">Пользователи</button>
+            <button type="button" class="menu-item" data-section="export">Экспорт и резервное копирование</button>
+            <button type="button" class="menu-item" data-section="instructions">Инструкции</button>
+        </nav>
+
+        <div class="admin-sidebar-footer">
+            <form method="post" action="/admin/logout">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="logout-btn">Выйти</button>
+            </form>
+
+            <div class="support-box">
+                <span>Нужна помощь?</span>
+                <a href="mailto:support@example.com">support@example.com</a>
+            </div>
+        </div>
+    </aside>
+
+    <button type="button" class="sidebar-open-toggle burger-btn" id="sidebarOpenToggle" aria-label="Открыть меню">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <main class="admin-content" id="adminContent">
+        <header class="admin-header">
+
+            <div>
+                <h1 id="pageTitle">Панель управления</h1>
+                <p id="pageSubtitle">Общая сводка административной панели</p>
+            </div>
+        </header>
+
+        <section class="admin-section active" id="dashboard">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_DashboardPanel.cshtml")
+        </section>
+
+        <section class="admin-section" id="learning">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_LearningPanel.cshtml", Model.LearningContent)
+        </section>
+
+        <section class="admin-section" id="tasks">
+             @await Html.PartialAsync("~/Views/Admin/Sections/_TasksPanel.cshtml", Model.TasksContent)
+        </section>
+
+        <section class="admin-section" id="pvp">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_PvpPanel.cshtml", Model.PvpContent)
+        </section>
+
+        <section class="admin-section" id="analytics">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_AnalyticsPanel.cshtml", Model.AnalyticsContent)
+        </section>
+
+        <section class="admin-section" id="users">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_UsersPanel.cshtml", Model.UsersContent)
+        </section>
+
+        <section class="admin-section" id="export">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_ExportPanel.cshtml")
+        </section>
+
+        <section class="admin-section" id="instructions">
+            @await Html.PartialAsync("~/Views/Admin/Sections/_InstructionsPanel.cshtml")
+        </section>
+    </main>
+</div>
+
+<script src="~/js/admin-learning.js"></script>
+<script src="~/js/admin-tasks.js"></script>
+<script src="~/js/admin-pvp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="~/js/admin-users.js"></script>
+<script src="~/js/admin-analytics.js"></script>
+
+<script src="~/js/admin-dashboard.js"></script>
+
+<script>
+    const sidebar = document.getElementById("adminSidebar");
+    const toggle = document.getElementById("sidebarToggle");
+    const openToggle = document.getElementById("sidebarOpenToggle");
+    const menuItems = document.querySelectorAll(".menu-item");
+    const sections = document.querySelectorAll(".admin-section");
+    const pageTitle = document.getElementById("pageTitle");
+    const pageSubtitle = document.getElementById("pageSubtitle");
+
+    toggle.classList.add("is-open");
+    openToggle.classList.remove("is-open");
+
+    const titles = {
+        dashboard:   ["Панель управления", "Общая сводка административной панели"],
+        learning:    ["Контент обучения", "Темы, уровни и теоретические материалы"],
+        tasks:       ["Задания", "Практические задания, тест-кейсы и подсказки"],
+        pvp:         ["PvP-турниры", "Турниры, банк вопросов и варианты ответов"],
+        analytics:   ["Аналитика", "Обезличенные метрики пользовательского опыта"],
+        users:       ["Пользователи", "Просмотр пользователей и прогресса"],
+        export:      ["Экспорт и резервное копирование", "Выгрузка данных и создание бэкапов"],
+        instructions:["Инструкции", "Справочные материалы для работы с административной панелью"]
+    };
+
+    function toggleSidebar() {
+        const isCollapsedNow = sidebar.classList.toggle("collapsed");
+        toggle.classList.toggle("is-open", !isCollapsedNow);
+        openToggle.classList.toggle("is-open", !isCollapsedNow);
+    }
+
+    toggle.addEventListener("click", toggleSidebar);
+    openToggle.addEventListener("click", toggleSidebar);
+
+    let _upInited = false;
+    let _anInited = false;
+
+    menuItems.forEach(item => {
+        item.addEventListener("click", () => {
+            const sectionId = item.dataset.section;
+
+            menuItems.forEach(i => i.classList.remove("active"));
+            item.classList.add("active");
+
+            sections.forEach(section => {
+                section.classList.toggle("active", section.id === sectionId);
+            });
+
+            pageTitle.textContent = titles[sectionId][0];
+            pageSubtitle.textContent = titles[sectionId][1];
+
+            if (sectionId === 'users' && !_upInited) {
+                _upInited = true;
+                upInit();
+            }
+
+            if (sectionId === 'analytics' && !_anInited) {
+                _anInited = true;
+                anInit();
+            }
+        });
+    });
+
+    lcInit();
+    tkInit();
+    pvInit();
+</script>

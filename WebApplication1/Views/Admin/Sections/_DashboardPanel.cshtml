@@ -1,0 +1,51 @@
+﻿<div class="card-grid">
+    <div class="admin-card">
+        <h3>Игроки</h3>
+        <p>@Model.PlayersCount зарегистрировано</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>Роли</h3>
+        <p>@Model.RolesCount роли в системе</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>Аватары</h3>
+        <p>@Model.AvatarsCount доступных аватаров</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>OTP-коды</h3>
+        <p>Всего: @Model.OtpCodesCount</p>
+        <p>Активных: @Model.ActiveOtpCodesCount</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>Сброс пароля</h3>
+        <p>Токены: @Model.PasswordResetTokensCount</p>
+        <p>Попытки: @Model.PasswordResetAttemptsCount</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>ELO-рейтинг</h3>
+        <p>Средний: @Model.AverageRating</p>
+        <p>Мин: @Model.MinRating | Макс: @Model.MaxRating</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>История рейтинга</h3>
+        <p>@Model.RatingHistoryCount записей</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>Контент обучения</h3>
+        <p>Темы: @Model.TopicsCount</p>
+        <p>Уровни: @Model.LevelsCount</p>
+        <p>Задания: @Model.TasksCount</p>
+    </div>
+
+    <div class="admin-card">
+        <h3>PvP-турниры</h3>
+        <p>@Model.TournamentsCount турниров</p>
+    </div>
+</div>

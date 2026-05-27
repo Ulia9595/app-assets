@@ -20,17 +20,20 @@ namespace WebApplication1.Controllers
         private readonly JwtService _jwtService;
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly UsernameService _usernameService;
 
         public AuthController(
             AuthService authService,
             JwtService jwtService,
             AppDbContext context,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            UsernameService usernameService)
         {
             _authService = authService;
             _jwtService = jwtService;
             _context = context;
             _configuration = configuration;
+            _usernameService = usernameService;
         }
 
         [HttpGet("public")]
@@ -95,41 +98,47 @@ namespace WebApplication1.Controllers
         {
             try
             {
-                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "test@example.com");
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == "test@example.com");
+
                 if (existingUser != null)
                 {
                     _context.Users.Remove(existingUser);
                     await _context.SaveChangesAsync();
                 }
 
+                var playerRole = await _context.Roles
+                    .FirstOrDefaultAsync(r => r.Code == "player");
+
+                if (playerRole == null)
+                    return StatusCode(500, new { error = "Роль player не найдена" });
+
+                var firstAvatar = await _context.AvailableAvatars
+                    .OrderBy(a => a.DisplayOrder)
+                    .FirstOrDefaultAsync();
+
                 var user = new User
                 {
                     Uid = "test-" + Guid.NewGuid(),
                     Email = "test@example.com",
                     PasswordHash = PasswordHelper.HashPassword("123456"),
+                    RoleId = playerRole.Id,
                     Name = "Test User",
-                    IsEmailVerified = true,
-                    IsActive = true,
-                    EloPoints = 750,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    AvatarId = firstAvatar?.Id,
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                var userRating = new UserRating
+                var userRating = await _context.UserRatings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.UserId == user.Id);
+
+                if (userRating == null)
                 {
-                    UserId = user.Id,
-                    CurrentRating = 750,
-                    Level = 0,
-                    GamesPlayed = 0,
-                    GamesWon = 0,
-                    GamesLost = 0,
-                    WinStreak = 0,
-                    BestRating = 750,
-                    LastUpdated = DateTime.UtcNow
-                };
+                    return StatusCode(500, new { error = "Рейтинг пользователя не создан" });
+                }
 
                 _context.UserRatings.Add(userRating);
                 await _context.SaveChangesAsync();
@@ -140,7 +149,11 @@ namespace WebApplication1.Controllers
                     message = "Test user created",
                     email = user.Email,
                     password = "123456",
-                    userId = user.Id
+                    role = playerRole.Code,
+                    userId = user.Id,
+                    avatarId = user.AvatarId,
+                    avatarUrl = firstAvatar?.Url,
+                    eloPoints = userRating.CurrentRating
                 });
             }
             catch (Exception ex)
@@ -170,8 +183,22 @@ namespace WebApplication1.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> CheckUsername(string username)
         {
-            var exists = await _context.Users.AnyAsync(u => u.Name != null && u.Name.ToLower() == username.ToLower());
-            return Ok(ApiResponse<bool>.Ok(!exists));
+            var result = await _usernameService.ValidateAndCheckUsernameAsync(username);
+
+            return result.Success
+                ? Ok(result)
+                : BadRequest(result);
+        }
+
+        [HttpGet("username-suggestions")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetUsernameSuggestions()
+        {
+            var result = await _usernameService.GenerateSuggestionsAsync(3);
+
+            return result.Success
+                ? Ok(result)
+                : BadRequest(result);
         }
 
         [HttpPost("register")]
@@ -283,7 +310,9 @@ namespace WebApplication1.Controllers
             var userId = GetCurrentUserId();
             var email = User.FindFirst(ClaimTypes.Email)?.Value;
             var uid = User.FindFirst("uid")?.Value;
-            return Ok(new { isValid = true, userId, email, uid });
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            return Ok(new { isValid = true, userId, email, uid, role });
         }
 
         [Authorize]
@@ -291,7 +320,15 @@ namespace WebApplication1.Controllers
         public IActionResult DebugClaims()
         {
             var claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList();
-            return Ok(new { claims, hasUid = claims.Any(c => c.Type == "uid"), hasEmail = claims.Any(c => c.Type == ClaimTypes.Email), hasUserId = claims.Any(c => c.Type == ClaimTypes.NameIdentifier) });
+
+            return Ok(new
+            {
+                claims,
+                hasUid = claims.Any(c => c.Type == "uid"),
+                hasEmail = claims.Any(c => c.Type == ClaimTypes.Email),
+                hasUserId = claims.Any(c => c.Type == ClaimTypes.NameIdentifier),
+                hasRole = claims.Any(c => c.Type == ClaimTypes.Role)
+            });
         }
 
         private int? GetCurrentUserId()

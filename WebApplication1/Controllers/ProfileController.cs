@@ -17,11 +17,16 @@ namespace WebApplication1.Controllers
     {
         private readonly ProfileService _profileService;
         private readonly AppDbContext _context;
+        private readonly RatingHistoryService _ratingHistoryService;
+        private readonly LeaderboardService _leaderboardService;
 
-        public ProfileController(ProfileService profileService, AppDbContext context)
+        public ProfileController(ProfileService profileService, AppDbContext context, RatingHistoryService ratingHistoryService, LeaderboardService leaderboardService)
         {
             _profileService = profileService;
             _context = context;
+            _ratingHistoryService = ratingHistoryService;
+            _leaderboardService = leaderboardService;
+            _leaderboardService = leaderboardService;
         }
 
         private string? GetCurrentUid()
@@ -86,8 +91,15 @@ namespace WebApplication1.Controllers
         public async Task<IActionResult> CheckUsername(string username)
         {
             var uid = GetCurrentUid();
-            var result = await _profileService.IsUsernameUniqueAsync(username, uid);
-            return Ok(result);
+
+            if (string.IsNullOrEmpty(uid))
+                return Unauthorized(ApiResponse<bool>.Fail("Пользователь не авторизован"));
+
+            var result = await _profileService.CheckUsernameAsync(username, uid);
+
+            return result.Success
+                ? Ok(result)
+                : BadRequest(result);
         }
 
         [HttpGet("elo")]
@@ -116,13 +128,39 @@ namespace WebApplication1.Controllers
         public IActionResult DebugClaims()
         {
             var claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList();
+
             return Ok(new
             {
                 claims,
                 hasUid = claims.Any(c => c.Type == "uid"),
                 hasEmail = claims.Any(c => c.Type == ClaimTypes.Email),
-                hasUserId = claims.Any(c => c.Type == ClaimTypes.NameIdentifier)
+                hasUserId = claims.Any(c => c.Type == ClaimTypes.NameIdentifier),
+                hasRole = claims.Any(c => c.Type == ClaimTypes.Role),
+                role = User.FindFirst(ClaimTypes.Role)?.Value
             });
+        }
+
+        [HttpGet("rating-history")]
+        public async Task<IActionResult> GetRatingHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var uid = GetCurrentUid();
+            if (string.IsNullOrEmpty(uid)) return Unauthorized();
+
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+            var result = await _ratingHistoryService.GetHistoryAsync(uid, page, pageSize);
+            return result.Success ? Ok(result) : NotFound(result);
+        }
+
+        [HttpGet("leaderboard")]
+        public async Task<IActionResult> GetLeaderboard()
+        {
+            var uid = GetCurrentUid();
+            if (string.IsNullOrEmpty(uid)) return Unauthorized();
+
+            var result = await _leaderboardService.GetLeaderboardAsync(uid);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
     }
 }

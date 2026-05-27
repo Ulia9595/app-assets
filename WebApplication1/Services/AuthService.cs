@@ -14,25 +14,42 @@ namespace WebApplication1.Services
         private readonly IConfiguration _configuration;
         private readonly JwtService _jwtService;
         private readonly ILogger<AuthService> _logger;
+        private readonly PasswordValidator _passwordValidator;
+        private readonly UsernameService _usernameService;
 
         public AuthService(
             AppDbContext context,
             IEmailService emailService,
             IConfiguration configuration,
             JwtService jwtService,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            PasswordValidator passwordValidator,
+            UsernameService usernameService)
         {
             _context = context;
             _emailService = emailService;
             _configuration = configuration;
             _jwtService = jwtService;
             _logger = logger;
+            _passwordValidator = passwordValidator;
+            _usernameService = usernameService;
+        }
+
+        private async Task<OtpPurpose?> GetOtpPurposeAsync(string purposeName)
+        {
+            return await _context.OtpPurposes
+                .FirstOrDefaultAsync(p => p.Name == purposeName);
         }
 
         public async Task<ApiResponse<string>> SendOtpAsync(SendOtpRequest request)
         {
             try
             {
+                var purpose = await GetOtpPurposeAsync(request.Purpose);
+
+                if (purpose == null)
+                    return ApiResponse<string>.Fail("Некорректное назначение OTP-кода");
+
                 if (request.Purpose == "registration")
                 {
                     var existingUser = await _context.Users
@@ -45,7 +62,7 @@ namespace WebApplication1.Services
                 var otpCode = new Random().Next(100000, 999999).ToString();
 
                 var oldOtps = await _context.OtpCodes
-                    .Where(o => o.Email == request.Email && o.Purpose == request.Purpose)
+                    .Where(o => o.Email == request.Email && o.PurposeId == purpose.Id)
                     .ToListAsync();
 
                 if (oldOtps.Any())
@@ -57,7 +74,7 @@ namespace WebApplication1.Services
                 {
                     Email = request.Email,
                     Code = otpCode,
-                    Purpose = request.Purpose,
+                    PurposeId = purpose.Id,
                     ExpiresAt = DateTime.UtcNow.AddMinutes(15)
                 };
 
@@ -84,9 +101,9 @@ namespace WebApplication1.Services
             {
                 var otp = await _context.OtpCodes
                     .Where(o => o.Email == request.Email &&
-                               o.Code == request.Code &&
-                               o.Used == false &&
-                               o.ExpiresAt > DateTime.UtcNow)
+                                o.Code == request.Code &&
+                                o.Used == false &&
+                                o.ExpiresAt > DateTime.UtcNow)
                     .FirstOrDefaultAsync();
 
                 if (otp == null)
@@ -108,10 +125,17 @@ namespace WebApplication1.Services
         {
             try
             {
-                _logger.LogInformation($"RegisterAsync вызван: Email={request.Email}, Name='{request.Name}', AvatarUrl='{request.AvatarUrl}'");
+                _logger.LogInformation(
+                    $"RegisterAsync вызван: Email={request.Email}, Name='{request.Name}', AvatarId='{request.AvatarId}'"
+                );
 
                 if (request.Password != request.PasswordRepeat)
                     return ApiResponse<AuthResponse>.Fail("Пароли не совпадают");
+
+                var usernameCheck = await _usernameService.ValidateAndCheckUsernameAsync(request.Name);
+
+                if (!usernameCheck.Success)
+                    return ApiResponse<AuthResponse>.Fail(usernameCheck.Error ?? "Некорректное имя пользователя");
 
                 var existingUser = await _context.Users
                     .FirstOrDefaultAsync(u => u.Email == request.Email);
@@ -119,22 +143,57 @@ namespace WebApplication1.Services
                 if (existingUser != null)
                     return ApiResponse<AuthResponse>.Fail("Пользователь с таким email уже существует");
 
+                var playerRole = await _context.Roles
+                    .FirstOrDefaultAsync(r => r.Code == "player");
+
+                if (playerRole == null)
+                    return ApiResponse<AuthResponse>.Fail("Роль игрока не найдена");
+
+                AvailableAvatar? avatar = null;
+
+                if (request.AvatarId.HasValue)
+                {
+                    avatar = await _context.AvailableAvatars
+                        .FirstOrDefaultAsync(a => a.Id == request.AvatarId.Value);
+
+                    if (avatar == null)
+                        return ApiResponse<AuthResponse>.Fail("Выбранный аватар не найден");
+                }
+
                 var user = new User
                 {
                     Uid = Guid.NewGuid().ToString(),
                     Email = request.Email,
                     PasswordHash = PasswordHelper.HashPassword(request.Password),
-                    Name = request.Name,
-                    AvatarUrl = request.AvatarUrl,
-                    EloPoints = 500,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    RoleId = playerRole.Id,
+                    Name = request.Name.Trim(),
+                    AvatarId = avatar?.Id,
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                var token = _jwtService.GenerateToken(user.Id, user.Email, user.Uid);
+                var userRating = await _context.UserRatings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.UserId == user.Id);
+
+                if (userRating == null)
+                    return ApiResponse<AuthResponse>.Fail("Ошибка создания рейтинга пользователя");
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _emailService.SendWelcomeEmail(user.Email, user.Name ?? "Игрок");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Ошибка фоновой отправки welcome email для {Email}", user.Email);
+                    }
+                });
+
+                var token = _jwtService.GenerateToken(user.Id, user.Email, user.Uid!, playerRole.Code);
 
                 var response = new AuthResponse
                 {
@@ -143,10 +202,11 @@ namespace WebApplication1.Services
                     {
                         Uid = user.Uid!,
                         Email = user.Email,
+                        Role = playerRole.Code,
                         Name = user.Name,
-                        AvatarUrl = user.AvatarUrl,
-                        EloPoints = user.EloPoints,
-                        IsEmailVerified = false
+                        AvatarId = user.AvatarId,
+                        AvatarUrl = avatar?.Url,
+                        EloPoints = userRating.CurrentRating
                     }
                 };
 
@@ -164,12 +224,30 @@ namespace WebApplication1.Services
             try
             {
                 var user = await _context.Users
+                    .Include(u => u.Role)
+                    .Include(u => u.Avatar)
+                    .Include(u => u.Rating)
                     .FirstOrDefaultAsync(u => u.Email == request.Email);
 
                 if (user == null || !PasswordHelper.VerifyPassword(request.Password, user.PasswordHash))
                     return ApiResponse<AuthResponse>.Fail("Неверный email или пароль");
 
-                var token = _jwtService.GenerateToken(user.Id, user.Email, user.Uid);
+                var rating = user.Rating;
+
+                if (rating == null)
+                {
+                    rating = new UserRating
+                    {
+                        UserId = user.Id,
+                        CurrentRating = 500,
+                        LastUpdated = DateTime.UtcNow
+                    };
+
+                    _context.UserRatings.Add(rating);
+                    await _context.SaveChangesAsync();
+                }
+
+                var token = _jwtService.GenerateToken(user.Id, user.Email, user.Uid!, user.Role.Code);
 
                 var response = new AuthResponse
                 {
@@ -178,10 +256,11 @@ namespace WebApplication1.Services
                     {
                         Uid = user.Uid!,
                         Email = user.Email,
+                        Role = user.Role.Code,
                         Name = user.Name,
-                        AvatarUrl = user.AvatarUrl,
-                        EloPoints = user.EloPoints,
-                        IsEmailVerified = user.IsEmailVerified
+                        AvatarId = user.AvatarId,
+                        AvatarUrl = user.Avatar?.Url,
+                        EloPoints = rating.CurrentRating
                     }
                 };
 
@@ -214,7 +293,7 @@ namespace WebApplication1.Services
 
                 var recentAttempts = await _context.PasswordResetAttempts
                     .CountAsync(a => a.Email == request.Email &&
-                                    a.CreatedAt > DateTime.UtcNow.AddHours(-1));
+                                     a.CreatedAt > DateTime.UtcNow.AddHours(-1));
 
                 if (recentAttempts >= maxAttempts)
                 {
@@ -222,13 +301,8 @@ namespace WebApplication1.Services
                     return ApiResponse<string>.Fail($"Превышен лимит попыток. Попробуйте через {blockMinutes} минут.");
                 }
 
-                var requireEmailConfirmation = _configuration.GetValue<bool>("SecuritySettings:RequireEmailConfirmation", false);
-                if (requireEmailConfirmation && !user.IsEmailVerified)
-                {
-                    return ApiResponse<string>.Fail("Подтвердите email перед сбросом пароля");
-                }
-
                 var token = Guid.NewGuid().ToString();
+
                 var resetToken = new PasswordResetToken
                 {
                     UserId = user.Id,
@@ -272,8 +346,22 @@ namespace WebApplication1.Services
                 if (request.NewPassword != request.ConfirmPassword)
                     return ApiResponse<bool>.Fail("Пароли не совпадают");
 
+                var passwordValidation = _passwordValidator.GetDetailedValidation(request.NewPassword);
+
+                if (!passwordValidation.IsValid)
+                {
+                    var missingRequirements = passwordValidation.Requirements
+                        .Where(r => !r.Value)
+                        .Select(r => r.Key);
+
+                    return ApiResponse<bool>.Fail(
+                        "Пароль не соответствует требованиям: " + string.Join(", ", missingRequirements)
+                    );
+                }
+
                 var token = await _context.PasswordResetTokens
                     .Include(t => t.User)
+                    .ThenInclude(u => u.Role)
                     .FirstOrDefaultAsync(t => t.Token == request.Token &&
                                              t.Used == false &&
                                              t.ExpiresAt > DateTime.UtcNow);
@@ -281,8 +369,10 @@ namespace WebApplication1.Services
                 if (token == null)
                     return ApiResponse<bool>.Fail("Неверный или просроченный токен");
 
+                if (token.User.Role.Code == "admin")
+                    return ApiResponse<bool>.Fail("Администратор не может менять пароль");
+
                 token.User.PasswordHash = PasswordHelper.HashPassword(request.NewPassword);
-                token.User.UpdatedAt = DateTime.UtcNow;
                 token.Used = true;
 
                 await _context.SaveChangesAsync();
@@ -307,13 +397,18 @@ namespace WebApplication1.Services
                 if (existingUser != null)
                     return ApiResponse<string>.Fail("Новый email уже используется");
 
+                var purpose = await GetOtpPurposeAsync("email_change");
+
+                if (purpose == null)
+                    return ApiResponse<string>.Fail("Назначение OTP-кода для смены email не найдено");
+
                 var otpCode = new Random().Next(100000, 999999).ToString();
 
                 var otp = new OtpCode
                 {
                     Email = newEmail,
                     Code = otpCode,
-                    Purpose = "email_change",
+                    PurposeId = purpose.Id,
                     ExpiresAt = DateTime.UtcNow.AddMinutes(15)
                 };
 
@@ -337,30 +432,7 @@ namespace WebApplication1.Services
 
         public async Task<ApiResponse<bool>> CheckUsernameAsync(string username)
         {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(username))
-                    return ApiResponse<bool>.Fail("Имя пользователя не может быть пустым");
-
-                if (username.Length < 2 || username.Length > 30)
-                    return ApiResponse<bool>.Fail("Имя должно быть от 2 до 30 символов");
-
-                if (!System.Text.RegularExpressions.Regex.IsMatch(username, @"[a-zA-Zа-яА-Я]"))
-                    return ApiResponse<bool>.Fail("Имя должно содержать хотя бы одну букву");
-
-                var existingUser = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Name != null && u.Name.ToLower() == username.ToLower());
-
-                if (existingUser != null)
-                    return ApiResponse<bool>.Ok(false);
-
-                return ApiResponse<bool>.Ok(true);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Ошибка проверки имени пользователя: {ex.Message}");
-                return ApiResponse<bool>.Fail($"Ошибка проверки имени: {ex.Message}");
-            }
+            return await _usernameService.ValidateAndCheckUsernameAsync(username);
         }
 
         public async Task<ApiResponse<bool>> ChangeEmailAsync(int userId, string newEmail, string otpCode)
@@ -369,10 +441,15 @@ namespace WebApplication1.Services
             {
                 _logger.LogInformation($"Вызов для UserId={userId}, NewEmail={newEmail}, OTP={otpCode}");
 
+                var purpose = await GetOtpPurposeAsync("email_change");
+
+                if (purpose == null)
+                    return ApiResponse<bool>.Fail("Назначение OTP-кода для смены email не найдено");
+
                 var otp = await _context.OtpCodes
                     .Where(o => o.Email == newEmail &&
                                 o.Code == otpCode &&
-                                o.Purpose == "email_change" &&
+                                o.PurposeId == purpose.Id &&
                                 o.Used == false &&
                                 o.ExpiresAt > DateTime.UtcNow)
                     .FirstOrDefaultAsync();
@@ -383,26 +460,25 @@ namespace WebApplication1.Services
                     return ApiResponse<bool>.Fail("Неверный или просроченный код");
                 }
 
+                var user = await _context.Users
+                    .Include(u => u.Role)
+                    .FirstOrDefaultAsync(u => u.Id == userId);
 
-                var user = await _context.Users.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning($"Пользователь с ID {userId} не найден");
                     return ApiResponse<bool>.Fail("Пользователь не найден");
                 }
 
-                _logger.LogInformation($"Старый email: {user.Email}, Новый email: {newEmail}");
+                if (user.Role.Code == "admin")
+                    return ApiResponse<bool>.Fail("Администратор не может менять email");
 
                 user.Email = newEmail;
-                user.IsEmailVerified = true;
-                user.UpdatedAt = DateTime.UtcNow;
-
                 otp.Used = true;
 
-                _logger.LogInformation($"Сохраняем изменения в БД...");
                 await _context.SaveChangesAsync();
-                _logger.LogInformation($"Email успешно изменен для пользователя ID {userId}");
 
+                _logger.LogInformation($"Email успешно изменен для пользователя ID {userId}");
                 return ApiResponse<bool>.Ok(true);
             }
             catch (Exception ex)
@@ -418,21 +494,36 @@ namespace WebApplication1.Services
             {
                 _logger.LogInformation($"Вызов для UserId={userId}, NewPoints={points}");
 
-                var user = await _context.Users.FindAsync(userId);
-                if (user == null)
+                var rating = await _context.UserRatings
+                    .FirstOrDefaultAsync(r => r.UserId == userId);
+
+                if (rating == null)
                 {
-                    _logger.LogWarning($"Пользователь с ID {userId} не найден");
-                    return ApiResponse<bool>.Fail("Пользователь не найден");
+                    var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
+
+                    if (!userExists)
+                    {
+                        _logger.LogWarning($"Пользователь с ID {userId} не найден");
+                        return ApiResponse<bool>.Fail("Пользователь не найден");
+                    }
+
+                    rating = new UserRating
+                    {
+                        UserId = userId,
+                        CurrentRating = 500,
+                        LastUpdated = DateTime.UtcNow
+                    };
+
+                    _context.UserRatings.Add(rating);
                 }
 
-                var oldPoints = user.EloPoints;
-                _logger.LogInformation($"Старый рейтинг: {oldPoints}, Новый рейтинг: {points}");
+                var oldPoints = rating.CurrentRating;
 
-                user.EloPoints = points;
-                user.UpdatedAt = DateTime.UtcNow;
+                rating.CurrentRating = points;
+                rating.LastUpdated = DateTime.UtcNow;
 
-                _logger.LogInformation($"Сохраняем изменения в БД...");
                 await _context.SaveChangesAsync();
+
                 _logger.LogInformation($"ELO рейтинг обновлен для пользователя {userId}: {oldPoints} -> {points}");
 
                 return ApiResponse<bool>.Ok(true);
@@ -443,6 +534,5 @@ namespace WebApplication1.Services
                 return ApiResponse<bool>.Fail($"Ошибка обновления рейтинга: {ex.Message}");
             }
         }
-
     }
 }

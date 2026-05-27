@@ -1,0 +1,250 @@
+﻿@model WebApplication1.Models.ViewModels.TasksContentViewModel
+@using System.Text.Json
+
+@{
+    var topicsJson = JsonSerializer.Serialize(Model.Topics, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var diffJson = JsonSerializer.Serialize(Model.DifficultyTypes, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var checkJson = JsonSerializer.Serialize(Model.CheckTypes, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="lc-layout lc-layout--tasks">
+
+    <div class="lc-col" id="tk-col-levels">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Уровни</h3>
+                <span class="lc-sublabel" id="tk-topic-label">Все темы</span>
+            </div>
+        </div>
+
+        <div class="lc-list" id="tk-levels-list">
+            @foreach (var topic in Model.Topics)
+            {
+                <div class="tk-topic-group">
+                    <div class="tk-topic-label">@topic.Name</div>
+                    @foreach (var level in topic.Levels)
+                    {
+                        <div class="lc-item tk-level-item" data-level-id="@level.Id"
+                             onclick="selectLevel(@level.Id, '@level.Name.Replace("'", "\\'")', @topic.Id)">
+                            <div class="lc-item-info">
+                                <span class="lc-item-order">@level.LevelNumber</span>
+                                <span class="lc-item-name">@level.Name</span>
+                            </div>
+                            <div class="lc-item-meta">
+                                <span class="lc-badge">@level.Tasks.Count задан.</span>
+                            </div>
+                            <i class="fa fa-chevron-right tk-arrow"></i>
+                        </div>
+                    }
+                </div>
+            }
+            @if (!Model.Topics.Any())
+            {
+                <div class="lc-empty-state">
+                    <i class="fa fa-layer-group"></i>
+                    <p>Темы и уровни ещё не созданы</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="lc-col lc-col--locked" id="tk-col-tasks">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Задания</h3>
+                <span class="lc-sublabel" id="tk-level-label">Выберите уровень</span>
+            </div>
+            <button class="lc-add-btn" id="tk-btn-add-task" disabled>
+                <i class="fa fa-plus"></i> Добавить
+            </button>
+        </div>
+        <div class="lc-list" id="tk-tasks-list">
+            <div class="lc-empty-state">
+                <i class="fa fa-code"></i>
+                <p>Выберите уровень слева</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="lc-col lc-col--locked" id="tk-col-details">
+        <div class="lc-col-header">
+            <div class="lc-col-title-wrap">
+                <h3>Детали задания</h3>
+                <span class="lc-sublabel" id="tk-task-label">Выберите задание</span>
+            </div>
+        </div>
+
+        <div class="tk-tabs" id="tk-tabs" style="display:none">
+            <button class="tk-tab active" data-tab="info">Условие</button>
+            <button class="tk-tab" data-tab="testcases" id="tk-tab-btn-testcases">Тест-кейсы</button>
+            <button class="tk-tab" data-tab="hints">Подсказки</button>
+            <button class="tk-tab" data-tab="algorithm" id="tk-tab-btn-algorithm">Алгоритм</button>
+        </div>
+
+        <div id="tk-tab-info" class="tk-tab-pane active">
+            <div class="lc-empty-state"><i class="fa fa-code"></i><p>Выберите задание</p></div>
+        </div>
+        <div id="tk-tab-testcases" class="tk-tab-pane" style="display:none">
+            <div class="lc-empty-state"></div>
+        </div>
+        <div id="tk-tab-hints" class="tk-tab-pane" style="display:none">
+            <div class="lc-empty-state"></div>
+        </div>
+        <div id="tk-tab-algorithm" class="tk-tab-pane" style="display:none">
+            <div class="lc-empty-state"></div>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="tk-modal-task">
+    <div class="lc-modal lc-modal--wide">
+        <div class="lc-modal-header">
+            <h4 id="tk-modal-task-title">Новое задание</h4>
+            <button class="lc-modal-close" onclick="closeModal('tk-modal-task')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="tk-task-id" value="0" />
+            <input type="hidden" id="tk-task-level-id" value="0" />
+
+            <div class="lc-field">
+                <label>Уровень <span class="req">*</span></label>
+                <select id="tk-task-level-select"></select>
+            </div>
+
+            <div class="lc-field lc-field--row">
+                <div class="lc-field">
+                    <label>Название <span class="req">*</span></label>
+                    <input type="text" id="tk-task-name" maxlength="500" placeholder="Название задания" />
+                </div>
+                <div class="lc-field lc-field--short">
+                    <label>Порядок</label>
+                    <input type="number" id="tk-task-order" min="0" value="0" />
+                </div>
+            </div>
+
+            <div class="lc-field">
+                <label>Условие задания <span class="req">*</span></label>
+                <textarea id="tk-task-condition" rows="6" placeholder="Опишите условие задачи..."></textarea>
+            </div>
+
+            <div class="lc-field lc-field--row">
+                <div class="lc-field">
+                    <label>Сложность <span class="req">*</span></label>
+                    <select id="tk-task-difficulty"></select>
+                </div>
+                <div class="lc-field">
+                    <label>Тип проверки <span class="req">*</span></label>
+                    <select id="tk-task-checktype"></select>
+                </div>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('tk-modal-task')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="tkSaveTask()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="tk-modal-testcase">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4 id="tk-modal-tc-title">Новый тест-кейс</h4>
+            <button class="lc-modal-close" onclick="closeModal('tk-modal-testcase')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="tk-tc-id" value="0" />
+            <input type="hidden" id="tk-tc-task-id" value="0" />
+            <div class="lc-field">
+                <label>Входные данные</label>
+                <textarea id="tk-tc-input" rows="3" placeholder="Входные данные (если нет — оставьте пустым)"></textarea>
+            </div>
+            <div class="lc-field">
+                <label>Ожидаемый вывод <span class="req">*</span></label>
+                <textarea id="tk-tc-output" rows="3" placeholder="Ожидаемый вывод программы"></textarea>
+            </div>
+            <div class="lc-field">
+                <label class="tk-checkbox-label">
+                    <input type="checkbox" id="tk-tc-hidden" />
+                    Скрытый тест-кейс (не показывать игроку)
+                </label>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('tk-modal-testcase')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="tkSaveTestCase()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="tk-modal-hint">
+    <div class="lc-modal">
+        <div class="lc-modal-header">
+            <h4 id="tk-modal-hint-title">Новая подсказка</h4>
+            <button class="lc-modal-close" onclick="closeModal('tk-modal-hint')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="tk-hint-id" value="0" />
+            <input type="hidden" id="tk-hint-task-id" value="0" />
+            <div class="lc-field">
+                <label>Текст подсказки <span class="req">*</span></label>
+                <textarea id="tk-hint-text" rows="4" placeholder="Введите текст подсказки..."></textarea>
+            </div>
+            <div class="lc-field lc-field--short">
+                <label>Порядок показа</label>
+                <input type="number" id="tk-hint-order" min="0" value="0" />
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('tk-modal-hint')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="tkSaveHint()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="tk-modal-algorithm">
+    <div class="lc-modal lc-modal--wide">
+        <div class="lc-modal-header">
+            <h4 id="tk-modal-algo-title">Алгоритм проверки</h4>
+            <button class="lc-modal-close" onclick="closeModal('tk-modal-algorithm')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <input type="hidden" id="tk-algo-id" value="0" />
+            <input type="hidden" id="tk-algo-task-id" value="0" />
+            <div class="lc-field">
+                <label>Код алгоритма <span class="req">*</span></label>
+                <textarea id="tk-algo-code" rows="14" class="tk-code-area" placeholder="// Код алгоритма кастомной проверки..."></textarea>
+            </div>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('tk-modal-algorithm')">Отмена</button>
+            <button class="lc-btn lc-btn--primary" onclick="tkSaveAlgorithm()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-modal-overlay" id="tk-modal-confirm">
+    <div class="lc-modal lc-modal--sm">
+        <div class="lc-modal-header">
+            <h4>Подтверждение удаления</h4>
+            <button class="lc-modal-close" onclick="closeModal('tk-modal-confirm')"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="lc-modal-body">
+            <p id="tk-confirm-text" style="margin:0;color:#374151;font-size:14px;"></p>
+        </div>
+        <div class="lc-modal-footer">
+            <button class="lc-btn lc-btn--ghost" onclick="closeModal('tk-modal-confirm')">Отмена</button>
+            <button class="lc-btn lc-btn--danger" id="tk-btn-confirm">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<div class="lc-toast" id="tk-toast"></div>
+
+@Html.AntiForgeryToken()
+
+<script>
+    const TK_TOPICS   = @Html.Raw(topicsJson);
+    const DIFFICULTY  = @Html.Raw(diffJson);
+    const CHECK_TYPES = @Html.Raw(checkJson);
+    const TK_TOKEN    = document.querySelector('input[name="__RequestVerificationToken"]').value;
+</script>

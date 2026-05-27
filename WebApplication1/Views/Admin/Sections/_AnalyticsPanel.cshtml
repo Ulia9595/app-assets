@@ -1,0 +1,102 @@
+﻿@model WebApplication1.Models.ViewModels.AnalyticsViewModel
+@using System.Text.Json
+
+@{
+    var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    var eloJson = JsonSerializer.Serialize(Model.EloDistribution, opts);
+    var progressJson = JsonSerializer.Serialize(Model.LearningProgress, opts);
+    var pvpJson = JsonSerializer.Serialize(Model.PvpStats, opts);
+    var perUserJson = JsonSerializer.Serialize(Model.PerUserAnalytics, opts);
+    var playerNamesJson = JsonSerializer.Serialize(Model.PlayerNames, opts);
+    var today = DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<div class="an-filters">
+    <div class="an-filter-group">
+        <label class="an-filter-label">Игрок</label>
+        <div class="an-autocomplete-wrap">
+            <input type="text" id="an-player-search"
+                   placeholder="Все игроки..." autocomplete="off" />
+            <ul id="an-player-dropdown" class="an-dropdown" hidden></ul>
+        </div>
+    </div>
+
+    <div class="an-filter-group">
+        <label class="an-filter-label">Период (прогресс / задания)</label>
+        <input type="date" id="an-date-from" max="@today" title="С" />
+        <span class="an-filter-sep">—</span>
+        <input type="date" id="an-date-to" max="@today" title="По" />
+    </div>
+
+    <div class="an-filter-group">
+        <label class="an-filter-label">Тема PvP</label>
+        <select id="an-pvp-topic">
+            <option value="">Все темы</option>
+        </select>
+    </div>
+
+    <button class="lc-btn lc-btn--ghost lc-btn--sm" onclick="anResetFilters()">
+        <i class="fa fa-times"></i> Сбросить
+    </button>
+</div>
+
+<div class="an-grid">
+
+    <div class="an-card">
+        <div class="an-card-header">
+            <h3>Распределение ELO-рейтинга</h3>
+            <p>Количество игроков по диапазонам рейтинга</p>
+        </div>
+        <div class="an-chart-wrap">
+            <canvas id="an-chart-elo"></canvas>
+        </div>
+    </div>
+
+    <div class="an-card">
+        <div class="an-card-header">
+            <h3>Динамика прохождения</h3>
+            <p>Завершённые темы и задания по месяцам</p>
+        </div>
+        <div class="an-chart-wrap">
+            <canvas id="an-chart-progress"></canvas>
+        </div>
+    </div>
+
+    <div class="an-card an-card--sm">
+        <div class="an-card-header">
+            <h3>Успешность заданий</h3>
+            <p>Правильные и неправильные решения</p>
+        </div>
+        <div class="an-chart-wrap an-chart-wrap--doughnut">
+            <canvas id="an-chart-solutions"></canvas>
+        </div>
+        <div class="an-legend">
+            <span class="an-legend-item an-legend--green" id="an-legend-correct">
+                Правильно: @Model.SolutionsCorrect
+            </span>
+            <span class="an-legend-item an-legend--red" id="an-legend-wrong">
+                Неправильно: @Model.SolutionsWrong
+            </span>
+        </div>
+    </div>
+
+    <div class="an-card an-card--sm">
+        <div class="an-card-header">
+            <h3>Статистика PvP-турниров</h3>
+            <p>Правильные и неправильные ответы по турнирам</p>
+        </div>
+        <div class="an-chart-wrap">
+            <canvas id="an-chart-pvp"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    const AN_ELO          = @Html.Raw(eloJson);
+    const AN_PROGRESS     = @Html.Raw(progressJson);
+    const AN_CORRECT      = @Model.SolutionsCorrect;
+    const AN_WRONG        = @Model.SolutionsWrong;
+    const AN_PVP          = @Html.Raw(pvpJson);
+    const AN_PER_USER     = @Html.Raw(perUserJson);
+    const AN_PLAYER_NAMES = @Html.Raw(playerNamesJson);
+</script>
