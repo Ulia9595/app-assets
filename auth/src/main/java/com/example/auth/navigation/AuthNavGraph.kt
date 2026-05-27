@@ -11,6 +11,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core_models.AuthStep
 import com.example.auth.domain.AuthViewModel
 import com.example.auth.ui.*
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import android.util.Log
 
 @Composable
@@ -20,6 +23,8 @@ fun AuthNavGraph(
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val uiState by authViewModel.uiState.collectAsState()
+    var finishTitle by remember { mutableStateOf("Регистрация завершена!") }
+    var finishSubtitle by remember { mutableStateOf("Добро пожаловать в систему") }
 
     LaunchedEffect(uiState.isUserAuthenticated) {
         if (uiState.isUserAuthenticated) {
@@ -27,7 +32,7 @@ fun AuthNavGraph(
                 popUpTo(AuthDestinations.Welcome.route) { inclusive = true }
             }
         } else {
-            Log.d("AUTH_NAV", "⚪ Пользователь НЕ авторизован, ждем...")
+            Log.d("AUTH_NAV", "Пользователь НЕ авторизован")
         }
     }
 
@@ -67,6 +72,8 @@ fun AuthNavGraph(
                 viewModel = authViewModel,
                 onLoginSuccess = {
                     authViewModel.clearError()
+                    finishTitle = "Авторизация завершена!"
+                    finishSubtitle = "С возвращением!"
                 },
                 onForgotPassword = {
                     navController.navigate(AuthDestinations.ForgotPassword.route)
@@ -88,7 +95,6 @@ fun AuthNavGraph(
                     navController.popBackStack()
                 },
                 onSuccess = { message ->
-                    navController.popBackStack()
                 }
             )
         }
@@ -154,8 +160,9 @@ fun AuthNavGraph(
                 viewModel = authViewModel,
                 onFinish = {
                     authViewModel.clearError()
-                    authViewModel.finishRegistration(onSuccess = {
-                    })
+                    finishTitle = "Регистрация завершена!"
+                    finishSubtitle = "Добро пожаловать в систему"
+                    authViewModel.finishRegistration(onSuccess = {})
                 },
                 onBack = {
                     authViewModel.clearError()
@@ -167,6 +174,8 @@ fun AuthNavGraph(
 
         composable(AuthDestinations.Finish.route) {
             FinishScreen(
+                title = finishTitle,
+                subtitle = finishSubtitle,
                 onAnimationFinished = {
                     onAuthFinished()
                 }

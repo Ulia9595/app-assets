@@ -14,5 +14,14 @@ class YandexEmailValidator : EmailValidator {
                         email.endsWith("@yandex.ua") ||
                         email.endsWith("@yandex.kz") ||
                         email.endsWith("@yandex.by") ||
-                        email.endsWith("@yandex.com"))
+                        email.endsWith("@yandex.com") ||
+                        email.endsWith("@mail.ru") ||
+                        email.endsWith("@list.ru") ||
+                        email.endsWith("@bk.ru") ||
+                        email.endsWith("@inbox.ru") ||
+                        email.endsWith("@rambler.ru") ||
+                        email.endsWith("@lenta.ru") ||
+                        email.endsWith("@ro.ru") ||
+                        email.endsWith("@vk.com") ||
+                        email.endsWith("@internet.ru"))
 }

@@ -12,12 +12,11 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 
 @Composable
-fun FinishScreen(onAnimationFinished: () -> Unit) {
-
-    LaunchedEffect(Unit) {
-        delay(2000)
-        onAnimationFinished()
-    }
+fun FinishScreen(
+    title: String,
+    subtitle: String,
+    onAnimationFinished: () -> Unit
+) {
     LaunchedEffect(Unit) {
         delay(2000)
         onAnimationFinished()
@@ -25,8 +24,8 @@ fun FinishScreen(onAnimationFinished: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Регистрация завершена!", style = MaterialTheme.typography.headlineMedium)
-            Text("Добро пожаловать в систему")
+            Text(title, style = MaterialTheme.typography.headlineMedium)
+            Text(subtitle)
         }
     }
 }

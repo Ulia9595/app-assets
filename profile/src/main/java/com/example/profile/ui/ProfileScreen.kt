@@ -1,4 +1,3 @@
-import android.util.Log
 import android.util.Patterns
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,11 +31,20 @@ import com.example.profile.ui.ProfileViewModel
 import com.example.security.NameValidator
 import kotlinx.coroutines.delay
 import com.example.security.YandexEmailValidator
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.draw.shadow
 
 @Composable
 fun ProfileScreen(
     profileViewModel: ProfileViewModel = viewModel(),
-    onLogoutNavigate: () -> Unit
+    unreadNotificationCount: Int = 0,
+    onLogoutNavigate: () -> Unit,
+    onGoToLobby: () -> Unit,
+    onGoToPvp: () -> Unit,
+    onGoToRatingHistory: () -> Unit,
+    onGoToLeaderboard: () -> Unit,
+    onGoToNotifications: () -> Unit
 ) {
     val state by profileViewModel.state.collectAsState()
 
@@ -46,13 +54,11 @@ fun ProfileScreen(
     var showChangeEmailDialog by remember { mutableStateOf(false) }
     var showOtpDialog by remember { mutableStateOf(false) }
     var tempNewEmail by remember { mutableStateOf("") }
-    var otpCode by remember { mutableStateOf("") }
+
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     val nameValidator = remember { NameValidator() }
-    val profanityFilter = remember { com.example.security.ProfanityFilter() }
-    val isNameValid = remember(tempName) {
-        nameValidator.isValid(tempName) && !profanityFilter.containsProfanity(tempName)
-    }
+    val isNameValid = remember(tempName) { nameValidator.isValid(tempName) }
 
     state.notificationMessage?.let { message ->
         AlertDialog(
@@ -71,11 +77,73 @@ fun ProfileScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            IconButton(
+                onClick = onGoToNotifications,
+                modifier = Modifier.padding(8.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (unreadNotificationCount > 0) {
+                            Badge(
+                                modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (unreadNotificationCount > 99) "99+"
+                                    else unreadNotificationCount.toString(),
+                                    modifier = Modifier.padding(horizontal = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "Уведомления",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
         if (state.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
+
+            if (showLogoutDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutDialog = false },
+                    title = { Text("Выход из профиля") },
+                    text = { Text("Вы уверены, что хотите выйти из аккаунта?") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showLogoutDialog = false
+                                profileViewModel.logout { onLogoutNavigate() }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD32F2F),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text("Выйти")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showLogoutDialog = false }) {
+                            Text("Отмена")
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Box(contentAlignment = Alignment.BottomEnd) {
                 AsyncImage(
                     model = state.avatarUrl ?: "https://via.placeholder.com/150",
@@ -87,7 +155,6 @@ fun ProfileScreen(
                         .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                     contentScale = ContentScale.Crop
                 )
-
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
@@ -115,7 +182,6 @@ fun ProfileScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
-
             TextButton(
                 onClick = { showChangeEmailDialog = true },
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -126,19 +192,13 @@ fun ProfileScreen(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    "Сменить email",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text("Сменить email", style = MaterialTheme.typography.bodySmall)
             }
 
             if (isEditingName) {
                 OutlinedTextField(
                     value = tempName,
-                    onValueChange = {
-                        val newValue = it.take(30)
-                        tempName = newValue
-                    },
+                    onValueChange = { tempName = it.take(30) },
                     label = { Text("Имя пользователя") },
                     singleLine = true,
                     isError = !isNameValid && tempName.isNotEmpty(),
@@ -150,21 +210,12 @@ fun ProfileScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.End
                             )
-
                             if (!isNameValid && tempName.isNotEmpty()) {
-                                if (profanityFilter.containsProfanity(tempName)) {
-                                    Text(
-                                        text = "Имя содержит недопустимые слова",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                } else {
-                                    Text(
-                                        text = "Имя должно содержать минимум 2 буквы, только буквы, цифры и _",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
+                                Text(
+                                    text = "Имя должно содержать минимум 2 буквы, только буквы, цифры и _",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
                     },
@@ -218,9 +269,7 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                        alpha = 0.5f
-                    )
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -248,9 +297,7 @@ fun ProfileScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-
                     Spacer(modifier = Modifier.height(12.dp))
-
                     LinearProgressIndicator(
                         progress = { state.levelProgress.coerceIn(0f, 1f) },
                         modifier = Modifier
@@ -260,7 +307,6 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.outlineVariant
                     )
-
                     Text(
                         text = "До уровня ${state.level + 1} осталось ${state.pointsToNextLevel} очков",
                         style = MaterialTheme.typography.labelSmall,
@@ -270,55 +316,79 @@ fun ProfileScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val newElo = state.eloPoints + 100
-                        profileViewModel.updateElo(newElo)
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                ) {
-                    Text("+100 ELO")
-                }
-
-                OutlinedButton(
-                    onClick = { profileViewModel.refreshProfile() },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Обновить")
-                }
-            }
-
             if (state.error != null) {
                 Text(
                     text = state.error!!,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
-                        .padding(top = 16.dp)
+                        .padding(top = 12.dp)
                         .clickable { profileViewModel.clearError() }
                 )
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Button(
-                onClick = { profileViewModel.logout { onLogoutNavigate() } },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFCDD2),
-                    contentColor = Color(0xFFD32F2F)
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        clip = false,
+                        ambientColor = Color.LightGray,
+                        spotColor = Color.LightGray
+                    )
             ) {
-                Text("Выйти из аккаунта")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onGoToRatingHistory) {
+                            Icon(
+                                Icons.Default.EmojiEvents,
+                                "История ELO",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = onGoToLeaderboard) {
+                            Icon(
+                                Icons.Default.Leaderboard,
+                                "Рейтинг",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = onGoToPvp) {
+                            Icon(
+                                Icons.Default.SportsEsports,
+                                "Турниры",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = onGoToLobby) {
+                            Icon(
+                                Icons.Default.Book,
+                                "Темы",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = { showLogoutDialog = true }) {
+                            Icon(Icons.Default.Logout, "Выход", tint = Color(0xFFD32F2F))
+                        }
+                    }
+                }
             }
         }
     }
@@ -335,23 +405,23 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(state.availableAvatars) { url ->
+                        items(state.availableAvatars) { avatar ->
                             Box(
                                 modifier = Modifier
                                     .aspectRatio(1f)
                                     .clip(CircleShape)
                                     .border(
-                                        width = if (state.avatarUrl == url) 3.dp else 1.dp,
-                                        color = if (state.avatarUrl == url) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                        width = if (state.avatarId == avatar.id) 3.dp else 1.dp,
+                                        color = if (state.avatarId == avatar.id) MaterialTheme.colorScheme.primary else Color.LightGray,
                                         shape = CircleShape
                                     )
                                     .clickable {
-                                        profileViewModel.selectAvatarFromList(url)
+                                        profileViewModel.selectAvatarFromList(avatar.id)
                                         showAvatarSelection = false
                                     }
                             ) {
                                 AsyncImage(
-                                    model = url,
+                                    model = avatar.url,
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
@@ -387,44 +457,19 @@ fun ProfileScreen(
                     OutlinedTextField(
                         value = newEmail,
                         onValueChange = { input ->
-                            val cleanEmail = input.filterNot { it.isWhitespace() }
-                            newEmail = cleanEmail
+                            newEmail = input.filterNot { it.isWhitespace() }
                             emailError = null
                         },
                         label = { Text("Новый email") },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                keyboardController?.hide()
-                                val trimmedEmail = newEmail.trim()
-                                when {
-                                    trimmedEmail.isEmpty() -> {
-                                        emailError = "Введите email"
-                                    }
-                                    !Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches() -> {
-                                        emailError = "Введите корректный email"
-                                    }
-                                    !yandexValidator.isValid(trimmedEmail) -> {
-                                        emailError = "Используйте только @yandex.ru или @ya.ru"
-                                    }
-                                }
-                            }
-                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
                         isError = emailError != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                         supportingText = {
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    horizontalArrangement = Arrangement.End,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
+                                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                                     Text(
-                                        text = "Только @yandex.ru / @ya.ru",
+                                        text = "Допускаются только российские почтовые сервисы.",
                                         color = if (emailError?.contains("yandex") == true)
                                             MaterialTheme.colorScheme.error
                                         else
@@ -432,81 +477,40 @@ fun ProfileScreen(
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 }
-
                                 if (emailError != null) {
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = emailError!!,
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
+                                    Text(text = emailError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
                     )
-
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Пример: user@yandex.ru или user@ya.ru",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    Text(text = "Пример: user@yandex.ru или user@ya.ru", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                 }
             },
             confirmButton = {
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    TextButton(
-                        onClick = {
-                            showChangeEmailDialog = false
-                            keyboardController?.hide()
-                        }
-                    ) {
-                        Text("Отмена")
-                    }
-
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { showChangeEmailDialog = false; keyboardController?.hide() }) { Text("Отмена") }
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Button(
                         onClick = {
-                            val trimmedEmail = newEmail.trim()
-
+                            val trimmed = newEmail.trim()
                             when {
-                                trimmedEmail.isEmpty() -> {
-                                    emailError = "Введите email"
-                                    return@Button
-                                }
-
-                                !Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches() -> {
-                                    emailError = "Введите корректный email"
-                                    return@Button
-                                }
-
-                                !yandexValidator.isValid(trimmedEmail) -> {
-                                    emailError = "Используйте только @yandex.ru или @ya.ru"
-                                    return@Button
-                                }
+                                trimmed.isEmpty() -> { emailError = "Введите email"; return@Button }
+                                !Patterns.EMAIL_ADDRESS.matcher(trimmed).matches() -> { emailError = "Введите корректный email"; return@Button }
+                                !yandexValidator.isValid(trimmed) -> { emailError = "Используйте только @yandex.ru или @ya.ru"; return@Button }
                             }
-
                             keyboardController?.hide()
-
-                            profileViewModel.sendEmailChangeOtp(trimmedEmail) { success, message ->
+                            profileViewModel.sendEmailChangeOtp(trimmed) { success, message ->
                                 if (success) {
-                                    tempNewEmail = trimmedEmail
+                                    tempNewEmail = trimmed
                                     showChangeEmailDialog = false
                                     showOtpDialog = true
                                 } else {
                                     emailError = when {
-                                        message?.contains("уже используется", ignoreCase = true) == true ->
-                                            "Этот email уже используется"
-                                        message?.contains("не найден", ignoreCase = true) == true ->
-                                            "Пользователь не найден"
-                                        message?.contains("network", ignoreCase = true) == true ->
-                                            "Проблемы с интернет-соединением"
-                                        message?.contains("не разрешено", ignoreCase = true) == true ->
-                                            "Смена email временно недоступна"
+                                        message?.contains("уже используется", ignoreCase = true) == true -> "Этот email уже используется"
+                                        message?.contains("не найден", ignoreCase = true) == true -> "Пользователь не найден"
+                                        message?.contains("network", ignoreCase = true) == true -> "Проблемы с интернет-соединением"
                                         else -> message ?: "Ошибка отправки кода"
                                     }
                                 }
@@ -514,18 +518,13 @@ fun ProfileScreen(
                         },
                         modifier = Modifier.height(40.dp),
                         enabled = newEmail.trim().isNotEmpty()
-                    ) {
-                        Text("Отправить код")
-                    }
+                    ) { Text("Отправить код") }
                 }
             },
             dismissButton = {}
         )
 
-        LaunchedEffect(Unit) {
-            delay(100)
-            focusRequester.requestFocus()
-        }
+        LaunchedEffect(Unit) { delay(100); focusRequester.requestFocus() }
     }
 
     if (showOtpDialog) {
@@ -535,12 +534,7 @@ fun ProfileScreen(
         val keyboardController = LocalSoftwareKeyboardController.current
 
         AlertDialog(
-            onDismissRequest = {
-                showOtpDialog = false
-                otpCode = ""
-                otpError = null
-                keyboardController?.hide()
-            },
+            onDismissRequest = { showOtpDialog = false; otpCode = ""; otpError = null; keyboardController?.hide() },
             title = { Text("Подтверждение смены email") },
             text = {
                 Column {
@@ -549,58 +543,31 @@ fun ProfileScreen(
                     OutlinedTextField(
                         value = otpCode,
                         onValueChange = { input ->
-                            val newText = input.filter { it.isDigit() }.take(6)
-                            otpCode = newText
+                            otpCode = input.filter { it.isDigit() }.take(6)
                             otpError = null
-
-                            if (newText.length == 6) {
-                                keyboardController?.hide()
-                            }
+                            if (otpCode.length == 6) keyboardController?.hide()
                         },
                         label = { Text("Код") },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Number,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                keyboardController?.hide()
-                                if (otpCode.isEmpty()) {
-                                    otpError = "Введите код"
-                                } else if (otpCode.length < 6) {
-                                    otpError = "Введите все 6 цифр"
-                                }
-                            }
-                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
                         isError = otpError != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                         supportingText = {
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    horizontalArrangement = Arrangement.End,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
+                                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                                     Text(
                                         text = "${otpCode.length} / 6",
-                                        color = if (otpCode.length == 6)
-                                            MaterialTheme.colorScheme.primary
-                                        else if (otpError != null)
-                                            MaterialTheme.colorScheme.error
-                                        else
-                                            MaterialTheme.colorScheme.secondary,
+                                        color = when {
+                                            otpCode.length == 6 -> MaterialTheme.colorScheme.primary
+                                            otpError != null -> MaterialTheme.colorScheme.error
+                                            else -> MaterialTheme.colorScheme.secondary
+                                        },
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 }
-
                                 if (otpError != null) {
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = otpError!!,
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
+                                    Text(text = otpError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
@@ -608,79 +575,27 @@ fun ProfileScreen(
                 }
             },
             confirmButton = {
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Кнопка Отмена
-                    TextButton(
-                        onClick = {
-                            showOtpDialog = false
-                            otpCode = ""
-                            otpError = null
-                            keyboardController?.hide()
-                        }
-                    ) {
-                        Text("Отмена")
-                    }
-
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { showOtpDialog = false; otpCode = ""; otpError = null; keyboardController?.hide() }) { Text("Отмена") }
                     Spacer(modifier = Modifier.width(8.dp))
-
-                    // Кнопка Подтвердить (текстовая)
                     Button(
                         onClick = {
-                            // Валидация на клиенте
                             when {
-                                otpCode.isEmpty() -> {
-                                    otpError = "Введите код"
-                                    return@Button
-                                }
-
-                                otpCode.length < 6 -> {
-                                    otpError = "Введите все 6 цифр"
-                                    return@Button
-                                }
-
-                                !otpCode.all { it.isDigit() } -> {
-                                    otpError = "Код должен содержать только цифры"
-                                    return@Button
-                                }
+                                otpCode.isEmpty() -> { otpError = "Введите код"; return@Button }
+                                otpCode.length < 6 -> { otpError = "Введите все 6 цифр"; return@Button }
+                                !otpCode.all { it.isDigit() } -> { otpError = "Код должен содержать только цифры"; return@Button }
                             }
-
                             keyboardController?.hide()
-
-                            profileViewModel.verifyEmailChange(
-                                tempNewEmail,
-                                otpCode
-                            ) { success, message ->
+                            profileViewModel.verifyEmailChange(tempNewEmail, otpCode) { success, message ->
                                 if (success) {
-                                    // Успех: закрываем диалог
-                                    showOtpDialog = false
-                                    otpCode = ""
-                                    otpError = null
-
-                                    // Показываем уведомление об успехе
-                                    // Можно использовать Snackbar или Toast
+                                    showOtpDialog = false; otpCode = ""; otpError = null
                                 } else {
-                                    // Ошибка: показываем сообщение от сервера
                                     otpError = when {
-                                        message?.contains(
-                                            "неверный",
-                                            ignoreCase = true
-                                        ) == true -> "Неверный код"
-
-                                        message?.contains(
-                                            "истёк",
-                                            ignoreCase = true
-                                        ) == true -> "Код устарел. Запросите новый"
-
+                                        message?.contains("неверный", ignoreCase = true) == true -> "Неверный код"
+                                        message?.contains("истёк", ignoreCase = true) == true -> "Код устарел. Запросите новый"
                                         message?.contains("404") == true -> "Пользователь не найден"
                                         message?.contains("401") == true -> "Ошибка авторизации"
-                                        message?.contains(
-                                            "network",
-                                            ignoreCase = true
-                                        ) == true -> "Проблемы с интернет-соединением"
-
+                                        message?.contains("network", ignoreCase = true) == true -> "Проблемы с интернет-соединением"
                                         else -> message ?: "Ошибка подтверждения кода"
                                     }
                                 }
@@ -688,30 +603,19 @@ fun ProfileScreen(
                         },
                         enabled = otpCode.length == 6,
                         modifier = Modifier.height(40.dp)
-                    ) {
-                        Text("Подтвердить")
-                    }
+                    ) { Text("Подтвердить") }
                 }
             },
             dismissButton = {}
         )
 
-        // Автофокус при открытии диалога
-        LaunchedEffect(showOtpDialog) {
-            if (showOtpDialog) {
-                delay(100)
-                focusRequester.requestFocus()
-            }
-        }
+        LaunchedEffect(showOtpDialog) { if (showOtpDialog) { delay(100); focusRequester.requestFocus() } }
     }
 }
 
 private fun maskEmail(email: String): String {
     if (email.isBlank() || !email.contains("@")) return email
-    val parts = email.split("@")
-    val localPart = parts[0]
-    val domain = parts[1]
-
+    val (localPart, domain) = email.split("@").let { it[0] to it[1] }
     return when {
         localPart.length <= 2 -> "${localPart.first()}***@$domain"
         else -> "${localPart.first()}***${localPart.takeLast(2)}@$domain"

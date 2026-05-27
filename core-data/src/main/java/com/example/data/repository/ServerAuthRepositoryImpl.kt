@@ -23,6 +23,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import com.example.core_models.AvatarData
+import com.example.data.AppConfig
 
 class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
     private val tokenManager = TokenManager(context)
@@ -37,7 +39,7 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
         val client = HttpClientFactory.createUnsafeOkHttpClient()
 
         val retrofit = Retrofit.Builder()
-            .baseUrl("http://192.168.0.102:5141/")
+            .baseUrl("${AppConfig.serverUrl}/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
@@ -65,7 +67,7 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
                 password = state.password,
                 passwordRepeat = state.passwordRepeat,
                 name = state.userName.trim(),
-                avatarUrl = state.selectedAvatarUrl
+                avatarId = state.selectedAvatarId
             )
 
             val response = apiService.register(request)
@@ -76,17 +78,21 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
                 if (apiResponse != null && apiResponse.success == true) {
                     apiResponse.data?.let { authResponse ->
 
-                        tokenManager.saveAccessToken(authResponse.token)
-
                         val userData = UserData.fromServerResponse(authResponse.user)
-                        val userJson = gson.toJson(userData)
-                        tokenManager.saveUserData(userJson)
 
+                        if (userData.role != "player") {
+                            tokenManager.clearAll()
+                            return@withContext Result.failure(
+                                Exception("Вход администратора недоступен в мобильном приложении")
+                            )
+                        }
+
+                        tokenManager.saveAccessToken(authResponse.token)
+                        tokenManager.saveUserData(gson.toJson(userData))
                         tokenManager.saveUserEmail(state.email)
 
                         val savedToken = tokenManager.getAccessToken()
                         val savedUserData = tokenManager.getUserData()
-                        val savedEmail = tokenManager.getUserEmail()
 
                         if (savedToken != null && savedUserData != null) {
                             return@withContext Result.success(Unit)
@@ -106,6 +112,7 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
                 } catch (e: Exception) {
                     "Не удалось прочитать тело ошибки"
                 }
+
                 try {
                     val errorJson = gson.fromJson(errorBody, ApiResponse::class.java)
                     val errorMessage = errorJson?.error ?: errorBody
@@ -195,22 +202,60 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
             }
         }
 
-    override suspend fun isUsernameUnique(name: String): Result<Boolean> =
+    override suspend fun getUsernameSuggestions(): Result<List<String>> =
         withContext(Dispatchers.IO) {
             try {
-                val response = apiService.checkUsernameForRegistration(name)
+                val response = apiService.getUsernameSuggestions()
 
                 if (response.success == true) {
-                    Result.success(response.data == true)
+                    val suggestions = response.data ?: emptyList()
+
+                    Result.success(suggestions)
                 } else {
-                    Result.failure(Exception(response.error ?: "Ошибка проверки имени"))
+                    Result.failure(Exception(response.error ?: "Ошибка генерации имени"))
                 }
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception("Сетевая ошибка: ${e.message ?: "Неизвестная ошибка"}"))
             }
         }
 
-    override suspend fun getAvailableAvatars(): Result<List<String>> = withContext(Dispatchers.IO) {
+    override suspend fun isUsernameUnique(name: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.checkUsernameForRegistration(name)
+
+            if (response.isSuccessful) {
+                val apiResponse = response.body()
+
+                if (apiResponse?.success == true) {
+                    Result.success(apiResponse.data == true)
+                } else {
+                    Result.failure(Exception(apiResponse?.error ?: "Ошибка проверки имени"))
+                }
+            } else {
+                val errorMessage = parseApiError(response.errorBody()?.string()) ?: "Ошибка проверки имени"
+                Result.failure(Exception(errorMessage))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(e.message ?: "Ошибка сети"))
+        }
+    }
+
+    private fun parseApiError(errorBody: String?): String? {
+        if (errorBody.isNullOrBlank()) return null
+
+        return try {
+            val errorResponse = gson.fromJson(
+                errorBody,
+                ApiResponse::class.java
+            )
+
+            errorResponse?.error
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun getAvailableAvatars(): Result<List<AvatarData>> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getAvailableAvatars()
 
@@ -219,7 +264,17 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
 
                 if (apiResponse != null) {
                     if (apiResponse.success == true) {
-                        return@withContext Result.success(apiResponse.data ?: emptyList())
+                        val avatars = apiResponse.data
+                            ?.map {
+                                AvatarData(
+                                    id = it.id,
+                                    url = it.url,
+                                    displayOrder = it.displayOrder
+                                )
+                            }
+                            ?: emptyList()
+
+                        return@withContext Result.success(avatars)
                     } else {
                         return@withContext Result.failure(
                             Exception(apiResponse.error ?: "Ошибка получения аватаров")
@@ -236,6 +291,7 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
                 } catch (e: Exception) {
                     response.message()
                 }
+
                 return@withContext Result.failure(
                     Exception("Ошибка ${response.code()}: $errorBody")
                 )
@@ -245,7 +301,7 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
         }
     }
 
-    override suspend fun completeRegistration(name: String, avatarUrl: String?): Result<Unit> {
+    override suspend fun completeRegistration(name: String, avatarId: Int?): Result<Unit> {
         return Result.success(Unit)
     }
 
@@ -288,14 +344,16 @@ class ServerAuthRepositoryImpl(private val context: Context) : AuthRepository {
                     if (apiResponse != null) {
                         if (apiResponse.success) {
                             apiResponse.data?.let { authResponse ->
-                                tokenManager.saveAccessToken(authResponse.token)
+                                val userData = UserData.fromServerResponse(authResponse.user)
 
-                                val userData = UserData(
-                                    uid = authResponse.user.uid,
-                                    email = authResponse.user.email,
-                                    name = authResponse.user.name ?: "",
-                                    avatarUrl = authResponse.user.avatarUrl
-                                )
+                                if (userData.role != "player") {
+                                    tokenManager.clearAll()
+                                    return@withContext Result.failure(
+                                        Exception("Вход администратора недоступен в мобильном приложении")
+                                    )
+                                }
+
+                                tokenManager.saveAccessToken(authResponse.token)
                                 tokenManager.saveUserData(gson.toJson(userData))
                                 tokenManager.saveUserEmail(authResponse.user.email)
 

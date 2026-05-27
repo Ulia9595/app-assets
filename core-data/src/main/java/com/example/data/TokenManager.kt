@@ -6,20 +6,22 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.auth0.android.jwt.JWT
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 
 private val Context.dataStore by preferencesDataStore(name = "auth_data_store")
 
 class TokenManager(private val context: Context) {
 
     companion object {
-        private val ACCESS_TOKEN_KEY = stringPreferencesKey("access_token")
+        private val ACCESS_TOKEN_KEY  = stringPreferencesKey("access_token")
         private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
-        private val USER_DATA_KEY = stringPreferencesKey("user_data")
-        private val IS_LOGGED_IN_KEY = booleanPreferencesKey("is_logged_in")
-        private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
+        private val USER_DATA_KEY     = stringPreferencesKey("user_data")
+        private val IS_LOGGED_IN_KEY  = booleanPreferencesKey("is_logged_in")
+        private val USER_EMAIL_KEY    = stringPreferencesKey("user_email")
     }
 
     private fun normalizeToken(token: String): String =
@@ -32,27 +34,22 @@ class TokenManager(private val context: Context) {
 
     suspend fun saveAccessToken(token: String) {
         val normalized = normalizeToken(token)
-
         if (!isValidJwt(normalized)) {
             Log.e("TOKEN_MANAGER", "Попытка сохранить НЕ JWT access-token: $normalized")
             return
         }
-
         context.dataStore.edit { preferences ->
             preferences[ACCESS_TOKEN_KEY] = normalized
             preferences[IS_LOGGED_IN_KEY] = true
         }
-
         Log.d("TOKEN_MANAGER", "Access token сохранён: '${normalized.take(20)}...'")
     }
 
     suspend fun saveRefreshToken(token: String) {
         val normalized = normalizeToken(token)
-
         context.dataStore.edit { preferences ->
             preferences[REFRESH_TOKEN_KEY] = normalized
         }
-
         Log.d("TOKEN_MANAGER", "Refresh token сохранён: '${normalized.take(20)}...'")
     }
 
@@ -64,9 +61,7 @@ class TokenManager(private val context: Context) {
             Log.e("TOKEN_MANAGER", "Access token отсутствует")
             return null
         }
-
         val normalized = normalizeToken(rawToken)
-
         if (!isValidJwt(normalized)) {
             Log.e("TOKEN_MANAGER", "В DataStore лежит битый access-token: $normalized")
             return null
@@ -83,7 +78,6 @@ class TokenManager(private val context: Context) {
             Log.e("TOKEN_MANAGER", "Refresh token отсутствует")
             return null
         }
-
         val normalized = normalizeToken(rawToken)
         Log.d("TOKEN_MANAGER", "Refresh token получен: '${normalized.take(20)}...'")
         return normalized
@@ -91,7 +85,7 @@ class TokenManager(private val context: Context) {
 
     suspend fun saveUserData(userDataJson: String) {
         context.dataStore.edit { preferences ->
-            preferences[USER_DATA_KEY] = userDataJson
+            preferences[USER_DATA_KEY]    = userDataJson
             preferences[IS_LOGGED_IN_KEY] = true
         }
         Log.d("TOKEN_MANAGER", "Данные пользователя сохранены")
@@ -115,4 +109,25 @@ class TokenManager(private val context: Context) {
 
     suspend fun isLoggedIn(): Boolean =
         context.dataStore.data.map { it[IS_LOGGED_IN_KEY] ?: false }.first()
+
+    fun getTokenBlocking(): String? = runBlocking { getAccessToken() }
+
+    fun getUserIdFromToken(): Int {
+        return try {
+            val token = runBlocking { getAccessToken() } ?: return 0
+            val jwt = JWT(token)
+
+            val longClaim = jwt.getClaim(
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+            ).asString()
+
+            val shortClaim = jwt.getClaim("nameid").asString()
+                ?: jwt.getClaim("sub").asString()
+
+            (longClaim ?: shortClaim)?.toIntOrNull() ?: 0
+        } catch (e: Exception) {
+            Log.e("TOKEN_MANAGER", "Ошибка декодирования userId из JWT: ${e.message}")
+            0
+        }
+    }
 }

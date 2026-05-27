@@ -46,7 +46,7 @@ interface ServerAuthApiService {
     suspend fun updateProfile(@Body request: UpdateProfileRequest): Response<ApiResponse<UserResponse>>
 
     @GET("api/Profile/avatars")
-    suspend fun getAvailableAvatars(): Response<ApiResponse<List<String>>>
+    suspend fun getAvailableAvatars(): Response<ApiResponse<List<AvatarResponse>>>
 
     @POST("api/Profile/complete-registration")
     suspend fun completeRegistration(@Body request: CompleteRegistrationRequest): Response<ApiResponse<UserResponse>>
@@ -54,18 +54,30 @@ interface ServerAuthApiService {
     @GET("api/Auth/check-username/{username}")
     suspend fun checkUsernameForRegistration(
         @Path("username") username: String
-    ): ApiResponse<Boolean>
+    ): Response<ApiResponse<Boolean>>
 
     @GET("api/Profile/check-username/{username}")
     suspend fun checkUsernameForProfile(
         @Path("username") username: String
-    ): ApiResponse<Boolean>
+    ): Response<ApiResponse<Boolean>>
 
     @PUT("api/Auth/elo/{points}")
     suspend fun updateEloPoints(
         @Path("points") points: Int
     ): Response<ApiResponse<Boolean>>
 
+    @GET("api/Auth/username-suggestions")
+    suspend fun getUsernameSuggestions(): ApiResponse<List<String>>
+
     @GET("api/Profile/elo")
     suspend fun getEloRating(): Response<ApiResponse<EloInfoResponse>>
+
+    @GET("api/profile/rating-history")
+    suspend fun getRatingHistory(
+        @Query("page") page: Int,
+        @Query("pageSize") pageSize: Int
+    ): Response<ApiResponse<List<RatingHistoryItemDto>>>
+
+    @GET("api/profile/leaderboard")
+    suspend fun getLeaderboard(): Response<ApiResponse<LeaderboardDataDto>>
 }

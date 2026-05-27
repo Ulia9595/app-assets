@@ -5,7 +5,7 @@ data class RegisterRequest(
     val password: String,
     val passwordRepeat: String,
     val name: String,
-    val avatarUrl: String? = null
+    val avatarId: Int? = null
 )
 
 data class LoginRequest(
@@ -35,12 +35,12 @@ data class ResetPasswordRequest(
 
 data class UpdateProfileRequest(
     val name: String? = null,
-    val avatarUrl: String? = null
+    val avatarId: Int? = null
 )
 
 data class CompleteRegistrationRequest(
     val name: String,
-    val avatarUrl: String?
+    val avatarId: Int?
 )
 
 data class ApiResponse<T>(
@@ -57,10 +57,11 @@ data class AuthResponse(
 data class UserResponse(
     val uid: String = "",
     val email: String = "",
+    val role: String = "player",
     val name: String? = null,
+    val avatarId: Int? = null,
     val avatarUrl: String? = null,
-    val eloPoints: Int = 500,
-    val isEmailVerified: Boolean = false
+    val eloPoints: Int = 500
 ) {
     val level: Int
         get() = eloPoints / 1000
@@ -78,11 +79,18 @@ data class UserResponse(
         get() = !name.isNullOrEmpty()
 }
 
+data class AvatarResponse(
+    val id: Int,
+    val url: String,
+    val displayOrder: Int = 0
+)
+
 data class ValidateResponse(
     val isValid: Boolean,
     val userId: Int?,
     val email: String?,
-    val uid: String?
+    val uid: String?,
+    val role: String? = null
 )
 
 data class SimpleResponse(

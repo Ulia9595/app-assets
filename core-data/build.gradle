@@ -21,16 +21,26 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'
+    }
+    packagingOptions {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/LICENSE.md"
+            excludes += "/META-INF/NOTICE.md"
+            excludes += "/META-INF/INDEX.LIST"
+        }
     }
 }
 
 dependencies {
     api(project(":core-models"))
+
+    implementation(libs.androidx.core.ktx)
 
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
@@ -42,4 +52,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     implementation("com.google.code.gson:gson:2.10.1")
+
+    implementation("com.microsoft.signalr:signalr:8.0.0")
+
+    implementation("io.reactivex.rxjava3:rxjava:3.1.8")
+    implementation("io.reactivex.rxjava3:rxandroid:3.0.2")
+
+    implementation("com.auth0.android:jwtdecode:2.0.2")
 }

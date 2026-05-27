@@ -4,7 +4,6 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import com.example.security.NameValidator
-import com.example.security.ProfanityFilter
 import androidx.lifecycle.viewModelScope
 import com.example.core_models.ProfileState
 import com.example.data.repository.ServerProfileRepositoryImpl
@@ -20,7 +19,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private val profileRepository = ServerProfileRepositoryImpl(application)
     private val authRepository = ServerAuthRepositoryImpl(application)
-    private val profanityFilter = ProfanityFilter()
 
     private val _state = MutableStateFlow(ProfileState())
     val state: StateFlow<ProfileState> = _state.asStateFlow()
@@ -40,8 +38,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             val userData = tokenManager.getUserData()
 
             val cleanToken = token?.trim()?.removeSurrounding("\"")
-            Log.d("PROFILE_VM", "🔑 3. Токен: ${token?.take(20)}...")
-            Log.d("PROFILE_VM", "📦 4. UserData из хранилища: $userData")
+            Log.d("PROFILE_VM", "Токен: ${token?.take(20)}...")
+            Log.d("PROFILE_VM", "UserData из хранилища: $userData")
 
             try {
                 profileRepository.getProfileData().collect { profileState ->
@@ -72,8 +70,11 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private fun loadAvailableAvatars() {
         viewModelScope.launch {
             val result = profileRepository.getAvailableAvatars()
-            result.onSuccess { urls ->
-                _state.update { it.copy(availableAvatars = urls) }
+
+            result.onSuccess { avatars ->
+                _state.update {
+                    it.copy(availableAvatars = avatars)
+                }
             }.onFailure { error ->
                 _state.update { it.copy(error = error.message) }
             }
@@ -96,15 +97,42 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         _state.update { it.copy(error = "Загрузка аватаров не поддерживается. Выберите аватар из списка.") }
     }
 
-    fun selectAvatarFromList(url: String) {
-        _state.update { it.copy(avatarUrl = url, isLoading = true, error = null) }
+    fun selectAvatarFromList(avatarId: Int) {
+        val selectedAvatar = _state.value.availableAvatars
+            .firstOrNull { it.id == avatarId }
+
+        if (selectedAvatar == null) {
+            _state.update { it.copy(error = "Выбранный аватар не найден") }
+            return
+        }
+
+        _state.update {
+            it.copy(
+                avatarId = selectedAvatar.id,
+                avatarUrl = selectedAvatar.url,
+                isLoading = true,
+                error = null
+            )
+        }
 
         viewModelScope.launch {
-            val result = profileRepository.updateUserAvatarUrl(url)
+            val result = profileRepository.updateUserAvatar(selectedAvatar.id)
+
             result.onSuccess {
-                _state.update { it.copy(isLoading = false) }
+                _state.update {
+                    it.copy(
+                        avatarId = selectedAvatar.id,
+                        avatarUrl = selectedAvatar.url,
+                        isLoading = false
+                    )
+                }
             }.onFailure { error ->
-                _state.update { it.copy(error = error.message, isLoading = false) }
+                _state.update {
+                    it.copy(
+                        error = error.message,
+                        isLoading = false
+                    )
+                }
             }
         }
     }
@@ -114,11 +142,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
         if (trimmedName.isBlank()) {
             _state.update { it.copy(error = "Имя не может быть пустым") }
-            return
-        }
-
-        if (profanityFilter.containsProfanity(trimmedName)) {
-            _state.update { it.copy(error = "Имя содержит недопустимые слова") }
             return
         }
 
@@ -232,5 +255,56 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearNotification() {
         _state.update { it.copy(notificationMessage = null) }
+    }
+
+    fun loadRatingHistory(reset: Boolean = false) {
+        viewModelScope.launch {
+            if (reset) {
+                _state.update {
+                    it.copy(
+                        ratingHistory = emptyList(),
+                        ratingHistoryPage = 1,
+                        ratingHistoryHasMore = true
+                    )
+                }
+            }
+
+            val currentPage = if (reset) 1 else _state.value.ratingHistoryPage
+
+            _state.update { it.copy(ratingHistoryLoading = true) }
+
+            val result = profileRepository.getRatingHistory(page = currentPage, pageSize = 20)
+
+            result.onSuccess { items ->
+                _state.update {
+                    it.copy(
+                        ratingHistory = if (reset) items else it.ratingHistory + items,
+                        ratingHistoryLoading = false,
+                        ratingHistoryHasMore = items.size == 20,
+                        ratingHistoryPage = currentPage + 1
+                    )
+                }
+            }.onFailure { error ->
+                _state.update { it.copy(ratingHistoryLoading = false, error = error.message) }
+            }
+        }
+    }
+
+    fun loadMoreRatingHistory() {
+        if (!_state.value.ratingHistoryLoading && _state.value.ratingHistoryHasMore) {
+            loadRatingHistory(reset = false)
+        }
+    }
+
+    fun loadLeaderboard() {
+        viewModelScope.launch {
+            _state.update { it.copy(leaderboardLoading = true) }
+            val result = profileRepository.getLeaderboard()
+            result.onSuccess { data ->
+                _state.update { it.copy(leaderboard = data, leaderboardLoading = false) }
+            }.onFailure { error ->
+                _state.update { it.copy(leaderboardLoading = false, error = error.message) }
+            }
+        }
     }
 }

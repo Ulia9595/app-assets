@@ -97,7 +97,7 @@ fun EmailScreen(
                         if (state.otpCode.isNotEmpty()) onNext()
                         else viewModel.sendCode(state.email, onSuccess = onNext)
                     } else {
-                        viewModel.setError("Используйте только @yandex.ru или @ya.ru")
+                        viewModel.setError("Используйте почту: yandex.ru, ya.ru, mail.ru, bk.ru, list.ru, inbox.ru, rambler.ru, vk.com и другие")
                     }
                 },
                 enabled = !state.isLoading && state.email.isNotEmpty(),

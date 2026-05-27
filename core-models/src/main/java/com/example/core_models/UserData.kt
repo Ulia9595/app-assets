@@ -7,9 +7,10 @@ data class UserData(
     val name: String = "",
     val email: String = "",
     val uid: String = "",
+    val role: String = "player",
+    val avatarId: Int? = null,
     val avatarUrl: String? = null,
-    val eloPoints: Int = 500,
-    val isEmailVerified: Boolean = false
+    val eloPoints: Int = 500
 ) {
     companion object {
         fun fromServerResponse(response: UserResponse): UserData {
@@ -17,9 +18,10 @@ data class UserData(
                 name = response.name ?: "",
                 email = response.email,
                 uid = response.uid,
+                role = response.role,
+                avatarId = response.avatarId,
                 avatarUrl = response.avatarUrl,
-                eloPoints = response.eloPoints,
-                isEmailVerified = response.isEmailVerified
+                eloPoints = response.eloPoints
             )
         }
     }
@@ -30,7 +32,7 @@ data class UserData(
             password = password,
             passwordRepeat = passwordRepeat,
             name = name,
-            avatarUrl = avatarUrl
+            avatarId = avatarId
         )
     }
 

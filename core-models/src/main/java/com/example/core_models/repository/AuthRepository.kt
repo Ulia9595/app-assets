@@ -2,6 +2,7 @@ package com.example.core_models.repository
 
 import com.example.core_models.AuthState
 import com.example.core_models.AuthStep
+import com.example.core_models.AvatarData
 import com.example.core_models.UserData
 
 interface AuthRepository {
@@ -9,8 +10,8 @@ interface AuthRepository {
     suspend fun sendOtpCode(email: String): Result<String>
     suspend fun verifyOtp(email: String, code: String): Result<Boolean>
     suspend fun isUsernameUnique(name: String): Result<Boolean>
-    suspend fun getAvailableAvatars(): Result<List<String>>
-    suspend fun completeRegistration(name: String, avatarUrl: String?): Result<Unit>
+    suspend fun getAvailableAvatars(): Result<List<AvatarData>>
+    suspend fun completeRegistration(name: String, avatarId: Int?): Result<Unit>
 
     fun isUserLoggedIn(): Boolean
     suspend fun signOut(): Result<Unit>
@@ -26,4 +27,6 @@ interface AuthRepository {
     suspend fun forgotPassword(email: String): Result<String>
     suspend fun changeEmail(newEmail: String): Result<String>
     suspend fun verifyEmailChange(newEmail: String, code: String): Result<Unit>
+
+    suspend fun getUsernameSuggestions(): Result<List<String>>
 }

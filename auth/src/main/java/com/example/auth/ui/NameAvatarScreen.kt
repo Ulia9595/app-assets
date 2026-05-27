@@ -77,8 +77,8 @@ fun NameAvatarScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(state.availableAvatars) { url ->
-                    val isSelected = state.selectedAvatarUrl == url
+                items(state.availableAvatars) { avatar ->
+                    val isSelected = state.selectedAvatarId == avatar.id
 
                     Box(
                         modifier = Modifier.fillMaxWidth(),
@@ -94,10 +94,15 @@ fun NameAvatarScreen(
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
                                     shape = CircleShape
                                 )
-                                .clickable { viewModel.selectAvatar(url) }
+                                .clickable {
+                                    viewModel.selectAvatar(
+                                        avatarId = avatar.id,
+                                        avatarUrl = avatar.url
+                                    )
+                                }
                         ) {
                             AsyncImage(
-                                model = url,
+                                model = avatar.url,
                                 contentDescription = "Avatar Option",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -188,14 +193,14 @@ fun NameAvatarScreen(
             onClick = {
                 Log.d(
                     "NAME_AVATAR",
-                    "📝 Данные: name='${state.userName}', avatar='${state.selectedAvatarUrl}'"
+                    "Данные: name='${state.userName}', avatarId='${state.selectedAvatarId}', avatarUrl='${state.selectedAvatarUrl}'"
                 )
 
                 viewModel.clearError()
                 viewModel.finishRegistration {
                     Log.d(
                         "NAME_AVATAR",
-                        "📊 После finishRegistration: isUserAuthenticated = ${state.isUserAuthenticated}"
+                        "После finishRegistration: isUserAuthenticated = ${state.isUserAuthenticated}"
                     )
                 }
             },

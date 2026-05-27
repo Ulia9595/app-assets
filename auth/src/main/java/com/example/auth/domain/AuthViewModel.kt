@@ -10,8 +10,6 @@ import com.example.core_models.AuthStep
 import com.example.core_models.repository.AuthRepository
 import com.example.data.repository.ServerAuthRepositoryImpl
 import com.example.security.NameValidator
-import com.example.security.ProfanityFilter
-import com.example.security.UsernameGenerator
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +31,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _emailInput = MutableSharedFlow<String>()
     private val nameValidator = NameValidator()
-    private val profanityFilter = ProfanityFilter()
 
     init {
         checkInitialAuth()
@@ -64,11 +61,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadAvailableAvatars() {
         viewModelScope.launch {
-            repository.getAvailableAvatars().onSuccess { urls ->
+            repository.getAvailableAvatars().onSuccess { avatars ->
+                val firstAvatar = avatars.firstOrNull()
+
                 _uiState.update {
                     it.copy(
-                        availableAvatars = urls,
-                        selectedAvatarUrl = urls.firstOrNull(),
+                        availableAvatars = avatars,
+                        selectedAvatarId = firstAvatar?.id,
+                        selectedAvatarUrl = firstAvatar?.url,
                         errorMessage = null
                     )
                 }
@@ -79,8 +79,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadUsernameSuggestions() {
-        val suggestions = List(3) { UsernameGenerator.generate() }
-        _uiState.update { it.copy(suggestedNames = suggestions) }
+        viewModelScope.launch {
+            val result = repository.getUsernameSuggestions()
+
+            result.onSuccess { list ->
+                _uiState.update { it.copy(suggestedNames = list) }
+            }.onFailure {
+                setError("Ошибка генерации имени")
+            }
+        }
     }
 
     fun updateStep(step: AuthStep) {
@@ -99,8 +106,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(errorMessage = null) }
     }
 
-    fun selectAvatar(url: String) {
-        _uiState.update { it.copy(selectedAvatarUrl = url) }
+    fun selectAvatar(avatarId: Int, avatarUrl: String) {
+        _uiState.update {
+            it.copy(
+                selectedAvatarId = avatarId,
+                selectedAvatarUrl = avatarUrl
+            )
+        }
     }
 
     private fun checkInitialAuth() {
@@ -233,7 +245,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun finishRegistration(onSuccess: () -> Unit) {
         val currentName = _uiState.value.userName.trim()
-        val avatarUrl = _uiState.value.selectedAvatarUrl
 
         setError(null)
 
@@ -257,35 +268,43 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        if (profanityFilter.containsProfanity(currentName)) {
-            setError("Имя содержит недопустимые слова")
-            return
-        }
-
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {
             try {
                 val checkResult = repository.isUsernameUnique(currentName)
 
-                if (checkResult.isSuccess) {
-                    val isUnique = checkResult.getOrNull()
+                if (checkResult.isFailure) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    setError(checkResult.exceptionOrNull()?.message ?: "Ошибка проверки имени")
+                    return@launch
+                }
 
-                    if (isUnique == true) {
-                        val registrationResult = registerUserUseCase.execute(_uiState.value)
+                val isUnique = checkResult.getOrNull() == true
 
-                        if (registrationResult.isSuccess) {
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    isUserAuthenticated = true
-                                )
-                            }
-                            onSuccess()
-                        }
+                if (!isUnique) {
+                    _uiState.update { it.copy(isLoading = false) }
+                    setError("Это имя уже занято")
+                    return@launch
+                }
+
+                val registrationResult = registerUserUseCase.execute(_uiState.value)
+
+                if (registrationResult.isSuccess) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isUserAuthenticated = true
+                        )
                     }
+                    onSuccess()
+                } else {
+                    _uiState.update { it.copy(isLoading = false) }
+                    setError(registrationResult.exceptionOrNull()?.message ?: "Ошибка регистрации")
                 }
             } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false) }
+                setError(e.message ?: "Ошибка подключения")
             }
         }
     }

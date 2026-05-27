@@ -19,6 +19,11 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import com.example.core_models.AvatarData
+import com.example.core_models.RatingHistoryItem
+import com.example.data.AppConfig
+import com.example.core_models.LeaderboardData
+import com.example.core_models.dto.LeaderboardDataDto
 
 class ServerProfileRepositoryImpl(private val context: Context) : ProfileRepository {
     private val tokenManager = TokenManager(context)
@@ -32,7 +37,7 @@ class ServerProfileRepositoryImpl(private val context: Context) : ProfileReposit
         val client = HttpClientFactory.createUnsafeOkHttpClient()
 
         val retrofit = Retrofit.Builder()
-            .baseUrl("http://192.168.0.102:5141/")
+            .baseUrl("${AppConfig.serverUrl}/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
@@ -95,6 +100,7 @@ class ServerProfileRepositoryImpl(private val context: Context) : ProfileReposit
                             ProfileState(
                                 name = userResponse.name ?: "",
                                 email = userResponse.email,
+                                avatarId = userResponse.avatarId,
                                 avatarUrl = userResponse.avatarUrl,
                                 eloPoints = eloPoints,
                                 isLoading = false,
@@ -117,13 +123,25 @@ class ServerProfileRepositoryImpl(private val context: Context) : ProfileReposit
         awaitClose()
     }
 
-    override suspend fun getAvailableAvatars(): Result<List<String>> = withContext(Dispatchers.IO) {
+    override suspend fun getAvailableAvatars(): Result<List<AvatarData>> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getAvailableAvatars()
+
             if (response.isSuccessful) {
                 val apiResponse = response.body()
+
                 if (apiResponse != null && apiResponse.success == true) {
-                    Result.success(apiResponse.data ?: emptyList())
+                    val avatars = apiResponse.data
+                        ?.map {
+                            AvatarData(
+                                id = it.id,
+                                url = it.url,
+                                displayOrder = it.displayOrder
+                            )
+                        }
+                        ?: emptyList()
+
+                    Result.success(avatars)
                 } else {
                     Result.failure(Exception(apiResponse?.error ?: "Ошибка получения аватаров"))
                 }
@@ -140,12 +158,14 @@ class ServerProfileRepositoryImpl(private val context: Context) : ProfileReposit
         return Result.failure(Exception("Загрузка аватаров не поддерживается. Выберите аватар из списка."))
     }
 
-    suspend fun updateUserAvatarUrl(url: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun updateUserAvatar(avatarId: Int): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val request = UpdateProfileRequest(avatarUrl = url)
+            val request = UpdateProfileRequest(avatarId = avatarId)
             val response = apiService.updateProfile(request)
+
             if (response.isSuccessful) {
                 val apiResponse = response.body()
+
                 if (apiResponse != null && apiResponse.success == true) {
                     Result.success(Unit)
                 } else {
@@ -164,27 +184,47 @@ class ServerProfileRepositoryImpl(private val context: Context) : ProfileReposit
         try {
             val checkResponse = apiService.checkUsernameForProfile(name)
 
-            if (checkResponse.success == true && checkResponse.data == true) {
+            if (!checkResponse.isSuccessful) {
+                val errorMessage = parseApiError(checkResponse.errorBody()?.string())
+                    ?: "Ошибка проверки имени"
+                return@withContext Result.failure(Exception(errorMessage))
+            }
 
+            val checkApiResponse = checkResponse.body()
+
+            if (checkApiResponse?.success == true && checkApiResponse.data == true) {
                 val updateRequest = UpdateProfileRequest(name = name)
                 val updateResponse = apiService.updateProfile(updateRequest)
 
                 if (updateResponse.isSuccessful) {
                     val updateApiResponse = updateResponse.body()
+
                     if (updateApiResponse?.success == true) {
                         Result.success(Unit)
                     } else {
                         Result.failure(Exception(updateApiResponse?.error ?: "Ошибка обновления имени"))
                     }
                 } else {
-                    Result.failure(Exception("Ошибка обновления профиля"))
+                    val errorMessage = parseApiError(updateResponse.errorBody()?.string())
+                        ?: "Ошибка обновления профиля"
+                    Result.failure(Exception(errorMessage))
                 }
-
             } else {
-                Result.failure(Exception("Это имя уже занято"))
+                Result.failure(Exception(checkApiResponse?.error ?: "Это имя уже занято"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(e.message ?: "Ошибка сети"))
+        }
+    }
+
+    private fun parseApiError(errorBody: String?): String? {
+        if (errorBody.isNullOrBlank()) return null
+
+        return try {
+            val errorResponse = gson.fromJson(errorBody, com.example.core_models.dto.ApiResponse::class.java)
+            errorResponse?.error
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -213,6 +253,48 @@ class ServerProfileRepositoryImpl(private val context: Context) : ProfileReposit
                 val apiResponse = response.body()
                 if (apiResponse?.success == true) Result.success(Unit)
                 else Result.failure(Exception(apiResponse?.error ?: "Ошибка смены email"))
+            } else {
+                val errorBody = response.errorBody()?.string() ?: response.message()
+                Result.failure(Exception("Ошибка ${response.code()}: $errorBody"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Ошибка сети: ${e.message}"))
+        }
+    }
+
+    suspend fun getRatingHistory(page: Int, pageSize: Int): Result<List<RatingHistoryItem>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.getRatingHistory(page = page, pageSize = pageSize)
+                if (response.isSuccessful) {
+                    val apiResponse = response.body()
+                    if (apiResponse?.success == true) {
+                        val items = apiResponse.data?.map { it.toDomain() } ?: emptyList()
+                        Result.success(items)
+                    } else {
+                        Result.failure(Exception(apiResponse?.error ?: "Ошибка загрузки истории"))
+                    }
+                } else {
+                    val errorBody = response.errorBody()?.string() ?: response.message()
+                    Result.failure(Exception("Ошибка ${response.code()}: $errorBody"))
+                }
+            } catch (e: Exception) {
+                Result.failure(Exception("Ошибка сети: ${e.message}"))
+            }
+        }
+
+    suspend fun getLeaderboard(): Result<LeaderboardData> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getLeaderboard()
+            if (response.isSuccessful) {
+                val apiResponse = response.body()
+                if (apiResponse?.success == true) {
+                    val dto: LeaderboardDataDto = apiResponse.data
+                        ?: return@withContext Result.failure(Exception("Данные рейтинга отсутствуют"))
+                    Result.success(dto.toDomain())
+                } else {
+                    Result.failure(Exception(apiResponse?.error ?: "Ошибка загрузки рейтинга"))
+                }
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 Result.failure(Exception("Ошибка ${response.code()}: $errorBody"))

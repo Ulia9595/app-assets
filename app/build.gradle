@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -21,6 +20,8 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
+
+        buildConfigField "String", "SERVER_URL", "\"http://10.0.2.2:5141\""
     }
 
     buildTypes {
@@ -32,6 +33,7 @@ android {
 
     buildFeatures {
         compose true
+        buildConfig true
     }
 
     compileOptions {
@@ -45,12 +47,13 @@ android {
     packagingOptions {
         resources {
             excludes += "**/*.aut"
-
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/NOTICE.md"
             excludes += "/META-INF/LICENSE-spec.html"
             excludes += "/META-INF/NOTICE-spec.html"
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/io.netty.versions.properties"
         }
     }
 }
@@ -62,7 +65,8 @@ dependencies {
     implementation(project(":core-ui"))
     implementation(project(":core-data"))
     implementation(project(":core-security"))
-    implementation(project(":core-notifications"))
+    implementation(project(":learning"))
+    implementation(project(":pvp"))
 
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
     implementation("androidx.compose.ui:ui")

@@ -3,22 +3,30 @@ package com.example.data.network
 import android.content.Context
 import android.util.Log
 import com.example.data.TokenManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.*
 
 object HttpClientFactory {
+
     private var tokenManager: TokenManager? = null
     private var unsafeClient: OkHttpClient? = null
+    private val _serverAvailable = MutableStateFlow(true)
+    val serverAvailable: StateFlow<Boolean> = _serverAvailable.asStateFlow()
 
     fun initialize(context: Context) {
         tokenManager = TokenManager(context)
-
         runBlocking {
-            val token = tokenManager?.getAccessToken()
+            tokenManager?.getAccessToken()
         }
     }
 
@@ -30,7 +38,6 @@ object HttpClientFactory {
     }
 
     private fun buildUnsafeOkHttpClient(): OkHttpClient {
-
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
@@ -38,7 +45,6 @@ object HttpClientFactory {
         return OkHttpClient.Builder()
             .addInterceptor(logging)
             .addInterceptor { chain ->
-
                 val originalRequest = chain.request()
                 val requestBuilder = originalRequest.newBuilder()
                     .addHeader("Accept", "application/json")
@@ -60,7 +66,7 @@ object HttpClientFactory {
                     val authToken = if (cleanToken.startsWith("Bearer ")) cleanToken else "Bearer $cleanToken"
                     requestBuilder.addHeader("Authorization", authToken)
                 } else {
-                    Log.w("HTTP_INTERCEPTOR", "⚠️ Токен отсутствует или пустой")
+                    Log.w("HTTP_INTERCEPTOR", "Токен отсутствует или пустой")
                 }
 
                 val request = requestBuilder.build()
@@ -76,13 +82,26 @@ object HttpClientFactory {
                 try {
                     val response = chain.proceed(request)
                     Log.d("HTTP_INTERCEPTOR", "Ответ получен: ${response.code}")
+                    _serverAvailable.value = true
                     response
                 } catch (e: Exception) {
-                    Log.e("HTTP_INTERCEPTOR", "Ошибка запроса", e)
+                    when (e) {
+                        is ConnectException,
+                        is SocketTimeoutException -> {
+                            Log.e("HTTP_INTERCEPTOR", "Сервер недоступен: ${e.message}")
+                            _serverAvailable.value = false
+                        }
+                        is UnknownHostException -> {
+                            Log.e("HTTP_INTERCEPTOR", "Хост не найден: ${e.message}")
+                        }
+                        else -> {
+                            Log.e("HTTP_INTERCEPTOR", "Ошибка запроса: ${e.message}")
+                        }
+                    }
                     throw e
                 }
             }
-            .connectTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .apply {
@@ -91,11 +110,9 @@ object HttpClientFactory {
                     override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
                     override fun getAcceptedIssuers() = arrayOf<X509Certificate>()
                 })
-
                 val sslContext = SSLContext.getInstance("SSL")
                 sslContext.init(null, trustAllCerts, java.security.SecureRandom())
                 val sslSocketFactory = sslContext.socketFactory
-
                 sslSocketFactory(sslSocketFactory, trustAllCerts[0] as X509TrustManager)
                 hostnameVerifier { _, _ -> true }
             }
@@ -104,9 +121,11 @@ object HttpClientFactory {
 
     fun testToken(): String? {
         return tokenManager?.let { manager ->
-            runBlocking {
-                manager.getAccessToken()
-            }
+            runBlocking { manager.getAccessToken() }
         }
+    }
+
+    fun resetServerAvailable() {
+        _serverAvailable.value = true
     }
 }
