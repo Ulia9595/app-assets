@@ -1,4 +1,4 @@
-﻿# Android Client - Game Authentication App
+﻿# Android Client - Game Kotlin App
 
 ## Описание
 Android приложение "Обучение KOTLIN" с элементами геймификации. Предназначен для изучения языка программирования Kotlin самостоятельно или в среде образовательных учреждений.
