@@ -55,3 +55,9 @@ TestResults/
 *.coverage
 *.log
 *.tmp
+
+# 9. Локальные тестовые проекты и файлы
+Server.Tests.Integration/
+WebApplication1.Tests/
+TextFile1.txt
+WebApplication1.slnx
