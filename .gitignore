@@ -61,3 +61,4 @@ Server.Tests.Integration/
 WebApplication1.Tests/
 TextFile1.txt
 WebApplication1.slnx
+WebApplication1/appsettings.Testing.json
